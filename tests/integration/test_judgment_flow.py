@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from src.models.article import Article
+from src.models.interest_profile import InterestProfile, JudgmentCriterion
 from src.models.judgment import BuzzLabel, InterestLabel, JudgmentResult
 from src.repositories.cache_repository import CacheRepository
 from src.services.llm_judge import LlmJudge
@@ -19,6 +20,25 @@ def mock_cache_repository() -> CacheRepository:
     mock_cache.put = Mock()  # 保存は成功する前提
     mock_cache.exists = Mock(return_value=False)
     return mock_cache
+
+
+@pytest.fixture
+def mock_interest_profile() -> InterestProfile:
+    """テスト用の関心プロファイルを返す."""
+    return InterestProfile(
+        summary="Test profile",
+        high_interest=["AI/ML"],
+        medium_interest=["Frontend"],
+        low_priority=["Tutorials"],
+        criteria={
+            "act_now": JudgmentCriterion(
+                label="ACT_NOW", description="Urgent", examples=[]
+            ),
+            "think": JudgmentCriterion(label="THINK", description="Design", examples=[]),
+            "fyi": JudgmentCriterion(label="FYI", description="Info", examples=[]),
+            "ignore": JudgmentCriterion(label="IGNORE", description="Not interested", examples=[]),
+        },
+    )
 
 
 @pytest.fixture
@@ -49,6 +69,7 @@ def sample_articles() -> list[Article]:
 @pytest.mark.asyncio
 async def test_judgment_flow_success(
     mock_cache_repository: CacheRepository,
+    mock_interest_profile: InterestProfile,
     sample_articles: list[Article],
 ) -> None:
     """判定フローが正常に動作することを確認."""
@@ -76,6 +97,7 @@ async def test_judgment_flow_success(
     llm_judge = LlmJudge(
         bedrock_client=mock_bedrock,
         cache_repository=mock_cache_repository,
+        interest_profile=mock_interest_profile,
         model_id="test-model",
         concurrency_limit=5,
     )
@@ -98,6 +120,7 @@ async def test_judgment_flow_success(
 @pytest.mark.asyncio
 async def test_judgment_flow_error_handling(
     mock_cache_repository: CacheRepository,
+    mock_interest_profile: InterestProfile,
     sample_articles: list[Article],
 ) -> None:
     """判定エラーが適切にハンドリングされることを確認."""
@@ -108,6 +131,7 @@ async def test_judgment_flow_error_handling(
     llm_judge = LlmJudge(
         bedrock_client=mock_bedrock,
         cache_repository=mock_cache_repository,
+        interest_profile=mock_interest_profile,
         model_id="test-model",
         concurrency_limit=5,
     )

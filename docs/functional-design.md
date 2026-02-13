@@ -21,11 +21,13 @@ graph TB
     CacheRepo[CacheRepository]
     HistoryRepo[HistoryRepository]
     SourceMaster[SourceMaster]
+    InterestMaster[InterestMaster]
 
     DynamoDB[(DynamoDB)]
     Bedrock[AWS Bedrock]
     SES[AWS SES]
     RSS[RSS/Atom Feeds]
+    InterestsYAML[config/interests.yaml]
 
     EventBridge -->|週2-3回実行| Lambda
     Lambda --> Orchestrator
@@ -43,6 +45,9 @@ graph TB
     Deduplicator --> BuzzScorer
     BuzzScorer --> CandidateSelector
     CandidateSelector --> LlmJudge
+
+    InterestMaster -.->|関心プロファイル| LlmJudge
+    InterestMaster --> InterestsYAML
 
     LlmJudge -.->|判定リクエスト| Bedrock
     LlmJudge --> CacheRepo
@@ -194,6 +199,52 @@ class BuzzScore:
 **制約**:
 - `source_count`: 1以上
 - `recency_score`, `domain_diversity_score`, `total_score`: 0-100の範囲
+
+### エンティティ: InterestProfile（関心プロファイル）
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class JudgmentCriterion:
+    """判定基準の定義.
+
+    Attributes:
+        label: 判定ラベル（ACT_NOW/THINK/FYI/IGNORE）
+        description: 判定基準の説明
+        examples: 該当する記事の例
+    """
+    label: str
+    description: str
+    examples: list[str]
+
+@dataclass
+class InterestProfile:
+    """関心プロファイル.
+
+    Attributes:
+        summary: プロファイルの概要
+        high_interest: 高い関心を持つトピックのリスト
+        medium_interest: 中程度の関心を持つトピックのリスト
+        low_priority: 低優先度のトピックのリスト
+        criteria: 判定基準の辞書（キー: act_now/think/fyi/ignore）
+    """
+    summary: str
+    high_interest: list[str]
+    medium_interest: list[str]
+    low_priority: list[str]
+    criteria: dict[str, JudgmentCriterion]
+```
+
+**制約**:
+- `summary`: 必須、プロファイルの概要説明
+- `high_interest`, `medium_interest`, `low_priority`: トピックリスト（空リスト可）
+- `criteria`: 必須、act_now/think/fyi/ignoreの4キーを含む
+
+**用途**:
+- LLM判定時のプロンプト生成に使用
+- config/interests.yamlから読み込み
+- InterestMasterがInterestProfileインスタンスを生成
 
 ### エンティティ: ExecutionSummary（実行サマリ）
 
@@ -1043,6 +1094,74 @@ sources:
 
 **依存関係**:
 - pyyaml（設定読み込み）
+
+### InterestMaster（関心マスタ）
+
+**責務**:
+- 関心プロファイル設定の読み込み
+- InterestProfileインスタンスの生成とキャッシュ
+
+**インターフェース**:
+```python
+from pathlib import Path
+
+class InterestMaster:
+    """関心マスタ."""
+
+    def __init__(self, config_path: str | Path) -> None:
+        """マスタを初期化する.
+
+        Args:
+            config_path: 設定ファイルパス（config/interests.yaml）
+        """
+        ...
+
+    def get_profile(self) -> InterestProfile:
+        """関心プロファイルを取得する.
+
+        Returns:
+            関心プロファイル
+
+        Raises:
+            FileNotFoundError: 設定ファイルが見つからない場合
+            ValueError: YAML解析に失敗した場合
+        """
+        ...
+```
+
+**設定ファイル例（interests.yaml）**:
+```yaml
+profile:
+  summary: |
+    プリンシパルエンジニアとして、技術的な深さと実践的な価値を重視します。
+  high_interest:
+    - AI/ML（大規模言語モデル、機械学習基盤）
+    - クラウドインフラ（AWS、マイクロサービス）
+  medium_interest:
+    - プログラミング言語の新機能
+  low_priority:
+    - 初心者向けチュートリアル
+
+criteria:
+  act_now:
+    label: "ACT_NOW"
+    description: "今すぐ読むべき記事"
+    examples:
+      - 重大なセキュリティ脆弱性の発見と対策
+  think:
+    label: "THINK"
+    description: "設計判断に役立つ記事"
+    examples:
+      - アーキテクチャパターンの比較
+```
+
+**依存関係**:
+- pyyaml（設定読み込み）
+
+**特徴**:
+- 初回読み込み時にInterestProfileインスタンスをキャッシュ
+- SourceMasterと同様の設計パターンを踏襲
+- LlmJudgeにDI経由でInterestProfileを提供
 
 ## ユースケース図
 

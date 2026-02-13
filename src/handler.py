@@ -8,6 +8,7 @@ from typing import Any
 import boto3
 
 from src.orchestrator.orchestrator import Orchestrator
+from src.repositories.interest_master import InterestMaster
 from src.repositories.source_master import SourceMaster
 from src.services.buzz_scorer import BuzzScorer
 from src.services.candidate_selector import CandidateSelector
@@ -66,6 +67,8 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
         # リポジトリ初期化
         source_master = SourceMaster(config.sources_config_path)
+        interest_master = InterestMaster("config/interests.yaml")
+        interest_profile = interest_master.get_profile()
         cache_repository = None  # MVPフェーズではキャッシュ機能を無効化
         history_repository = None  # MVPフェーズでは履歴保存機能を無効化
 
@@ -78,6 +81,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         llm_judge = LlmJudge(
             bedrock_client=bedrock_runtime,
             cache_repository=cache_repository,
+            interest_profile=interest_profile,
             model_id=config.bedrock_model_id,
         )
         final_selector = FinalSelector(

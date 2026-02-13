@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from src.models.article import Article
+from src.models.interest_profile import InterestProfile
 from src.models.judgment import BuzzLabel, InterestLabel, JudgmentResult
 from src.repositories.cache_repository import CacheRepository
 from src.shared.exceptions.llm_error import LlmJsonParseError
@@ -36,6 +37,7 @@ class LlmJudge:
     Attributes:
         _bedrock_client: Bedrock Runtimeクライアント
         _cache_repository: キャッシュリポジトリ
+        _interest_profile: 関心プロファイル
         _model_id: 使用するLLMモデルID
         _max_retries: 最大リトライ回数
         _concurrency_limit: 並列度制限
@@ -45,6 +47,7 @@ class LlmJudge:
         self,
         bedrock_client: Any,
         cache_repository: CacheRepository | None,
+        interest_profile: InterestProfile,
         model_id: str,
         max_retries: int = 2,
         concurrency_limit: int = 5,
@@ -54,12 +57,14 @@ class LlmJudge:
         Args:
             bedrock_client: Bedrock Runtimeクライアント（boto3.client('bedrock-runtime')）
             cache_repository: キャッシュリポジトリ
+            interest_profile: 関心プロファイル
             model_id: 使用するLLMモデルID
             max_retries: 最大リトライ回数（デフォルト: 2）
             concurrency_limit: 並列度制限（デフォルト: 5）
         """
         self._bedrock_client = bedrock_client
         self._cache_repository = cache_repository
+        self._interest_profile = interest_profile
         self._model_id = model_id
         self._max_retries = max_retries
         self._concurrency_limit = concurrency_limit
@@ -232,12 +237,14 @@ class LlmJudge:
         Returns:
             プロンプト文字列
         """
+        # InterestProfileから動的に生成
+        profile_text = self._interest_profile.format_for_prompt()
+        criteria_text = self._interest_profile.format_criteria_for_prompt()
+
         return f"""以下の記事について、関心度と話題性を判定してください。
 
 # 関心プロファイル
-- プリンシパルエンジニアとして、技術的な深さと実践的な価値を重視
-- 新しい技術トレンド、アーキテクチャ設計、パフォーマンス最適化に関心
-- AI/ML、クラウドインフラ、開発生産性向上のトピックに注目
+{profile_text}
 
 # 記事情報
 - タイトル: {article.title}
@@ -247,10 +254,7 @@ class LlmJudge:
 
 # 判定基準
 **interest_label**（関心度）:
-- ACT_NOW: 今すぐ読むべき（緊急性・重要性が高い）
-- THINK: 設計判断に役立つ（アーキテクチャ・技術選定に有用）
-- FYI: 知っておくとよい（一般的な技術情報）
-- IGNORE: 関心外（上記に該当しない）
+{criteria_text}
 
 **buzz_label**（話題性）:
 - HIGH: 非常に話題（多くのエンジニアが注目）
