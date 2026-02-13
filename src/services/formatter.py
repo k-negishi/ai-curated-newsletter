@@ -113,9 +113,9 @@ class Formatter:
             フォーマット済みテキストの行リスト
         """
         lines = []
-        lines.append(f"[{index}] {article.url}")
-        lines.append(f"話題性: {article.buzz_label.value}")
-        lines.append(f"信頼度: {article.confidence:.2f}")
-        lines.append(f"理由: {article.reason}")
+        lines.append(f"[{index}] {article.title}")
+        lines.append(f"URL: {article.url}")
+        lines.append(f"Buzz: {article.buzz_label.value}")
+        lines.append(f"概要: {article.description}")
         lines.append("-" * 80)
         return lines

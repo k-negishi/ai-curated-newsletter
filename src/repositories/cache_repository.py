@@ -80,6 +80,8 @@ class CacheRepository:
 
             return JudgmentResult(
                 url=item["url"],
+                title=item.get("title", "No Title"),  # 欠損値の場合は"No Title"
+                description=item.get("description", ""),  # 欠損値の場合は空文字列
                 interest_label=InterestLabel(item["interest_label"]),
                 buzz_label=BuzzLabel(item["buzz_label"]),
                 confidence=float(item["confidence"]),
@@ -104,6 +106,8 @@ class CacheRepository:
                     "PK": self._generate_pk(judgment.url),
                     "SK": self._generate_sk(),
                     "url": judgment.url,
+                    "title": judgment.title,
+                    "description": judgment.description,
                     "interest_label": judgment.interest_label.value,
                     "buzz_label": judgment.buzz_label.value,
                     "confidence": judgment.confidence,

@@ -22,10 +22,14 @@ class TestFinalSelector:
         interest_label: InterestLabel,
         buzz_label: BuzzLabel,
         confidence: float = 0.9,
+        title: str = "Test Article",
+        description: str = "Test description",
     ) -> JudgmentResult:
         """JudgmentResultを生成するヘルパー."""
         return JudgmentResult(
             url=url,
+            title=title,
+            description=description,
             interest_label=interest_label,
             buzz_label=buzz_label,
             confidence=confidence,

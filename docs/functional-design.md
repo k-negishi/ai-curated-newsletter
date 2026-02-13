@@ -139,6 +139,8 @@ class JudgmentResult:
 
     Attributes:
         url: 記事URL（キャッシュキー）
+        title: 記事タイトル
+        description: 記事の概要（最大800文字）
         interest_label: 関心度ラベル
         buzz_label: 話題性ラベル
         confidence: 信頼度（0.0-1.0）
@@ -147,6 +149,8 @@ class JudgmentResult:
         judged_at: 判定日時（UTC）
     """
     url: str                    # 記事URL
+    title: str                  # 記事タイトル
+    description: str            # 記事の概要（最大800文字）
     interest_label: InterestLabel  # ACT_NOW | THINK | FYI | IGNORE
     buzz_label: BuzzLabel       # HIGH | MID | LOW
     confidence: float           # 0.0-1.0
@@ -156,6 +160,9 @@ class JudgmentResult:
 ```
 
 **制約**:
+- `url`: 必須、正規化済み、一意キー
+- `title`: 必須、最大500文字（Articleから継承）
+- `description`: 最大800文字、空文字列可（Articleから継承）
 - `interest_label`: 4つの値のみ許可
 - `buzz_label`: 3つの値のみ許可
 - `confidence`: 0.0-1.0の範囲
@@ -895,15 +902,17 @@ SK: JUDGMENT#v1
 
 Attributes:
 - url (string)
+- title (string)
+- description (string)
 - interest_label (string)
 - buzz_label (string)
 - confidence (number)
 - reason (string)
 - model_id (string)
 - judged_at (string, ISO8601)
-- title (string)
-- source_name (string)
 ```
+
+**注意**: 既存のキャッシュデータには`title`と`description`が含まれていない可能性があるため、CacheRepository.getメソッドで`item.get("title", "No Title")`と`item.get("description", "")`を使用してデフォルト値を設定する。
 
 **依存関係**:
 - DynamoDB（boto3）

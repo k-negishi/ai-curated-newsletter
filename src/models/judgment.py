@@ -43,6 +43,8 @@ class JudgmentResult:
 
     Attributes:
         url: 記事URL（キャッシュキー）
+        title: 記事タイトル
+        description: 記事の概要（最大800文字）
         interest_label: 関心度ラベル
         buzz_label: 話題性ラベル
         confidence: 信頼度（0.0-1.0）
@@ -52,6 +54,8 @@ class JudgmentResult:
     """
 
     url: str
+    title: str
+    description: str
     interest_label: InterestLabel
     buzz_label: BuzzLabel
     confidence: float
