@@ -38,6 +38,8 @@ python-dateutil==2.9.0.post0
     # via botocore
 python-dotenv==1.2.1
     # via ai-curated-newsletter (pyproject.toml)
+pyyaml==6.0.3
+    # via ai-curated-newsletter (pyproject.toml)
 s3transfer==0.16.0
     # via boto3
 sgmllib3k==1.0.0

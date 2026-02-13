@@ -280,7 +280,7 @@ LOG_LEVEL=INFO
 DYNAMODB_CACHE_TABLE=ai-curated-newsletter-cache
 DYNAMODB_HISTORY_TABLE=ai-curated-newsletter-history
 SOURCE_CONFIG_S3_BUCKET=ai-curated-newsletter-config
-SOURCE_CONFIG_S3_KEY=sources.json
+SOURCE_CONFIG_S3_KEY=sources.yaml
 BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
 BEDROCK_MAX_PARALLEL=5
 LLM_CANDIDATE_MAX=150
@@ -419,7 +419,7 @@ logger.info(
 ### 収集元の拡張性
 
 **Phase 1（MVP）:**
-- 収集元マスタ: S3上のJSON設定ファイル（`sources.json`）
+- 収集元マスタ: S3上のJSON設定ファイル（`sources.yaml`）
 - 手動編集 → S3アップロード → Lambda再起動
 
 **Phase 2（拡張）:**

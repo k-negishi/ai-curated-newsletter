@@ -1019,36 +1019,30 @@ class SourceMaster:
         ...
 ```
 
-**設定ファイル例（sources.json）**:
-```json
-{
-  "sources": [
-    {
-      "source_id": "hacker_news",
-      "name": "Hacker News",
-      "feed_url": "https://news.ycombinator.com/rss",
-      "feed_type": "rss",
-      "priority": "high",
-      "timeout_seconds": 10,
-      "retry_count": 2,
-      "enabled": true
-    },
-    {
-      "source_id": "hatena_bookmark",
-      "name": "はてなブックマーク",
-      "feed_url": "https://b.hatena.ne.jp/hotentry/it.rss",
-      "feed_type": "rss",
-      "priority": "high",
-      "timeout_seconds": 10,
-      "retry_count": 2,
-      "enabled": true
-    }
-  ]
-}
+**設定ファイル例（sources.yaml）**:
+```yaml
+sources:
+  - source_id: hacker_news
+    name: Hacker News
+    feed_url: https://news.ycombinator.com/rss
+    feed_type: rss
+    priority: high
+    timeout_seconds: 10
+    retry_count: 2
+    enabled: true
+
+  - source_id: hatena_bookmark
+    name: はてなブックマーク
+    feed_url: https://b.hatena.ne.jp/hotentry/it.rss
+    feed_type: rss
+    priority: high
+    timeout_seconds: 10
+    retry_count: 2
+    enabled: true
 ```
 
 **依存関係**:
-- json（設定読み込み）
+- pyyaml（設定読み込み）
 
 ## ユースケース図
 

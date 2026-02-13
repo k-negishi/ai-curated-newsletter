@@ -25,7 +25,7 @@ def test_load_config_local_defaults() -> None:
             "LLM_CANDIDATE_MAX": "150",
             "FINAL_SELECT_MAX": "12",
             "FINAL_SELECT_MAX_PER_DOMAIN": "4",
-            "SOURCES_CONFIG_PATH": "config/sources.json",
+            "SOURCES_CONFIG_PATH": "config/sources.yaml",
             "FROM_EMAIL": "noreply@example.com",
             "TO_EMAIL": "recipient@example.com",
         },
@@ -43,7 +43,7 @@ def test_load_config_local_defaults() -> None:
         assert config.llm_candidate_max == 150
         assert config.final_select_max == 12
         assert config.final_select_max_per_domain == 4
-        assert config.sources_config_path == "config/sources.json"
+        assert config.sources_config_path == "config/sources.yaml"
         assert config.from_email == "noreply@example.com"
         assert config.to_email == "recipient@example.com"
 
@@ -61,7 +61,7 @@ def test_load_config_local_with_env_vars() -> None:
         "LLM_CANDIDATE_MAX": "200",
         "FINAL_SELECT_MAX": "20",
         "FINAL_SELECT_MAX_PER_DOMAIN": "5",
-        "SOURCES_CONFIG_PATH": "custom/sources.json",
+        "SOURCES_CONFIG_PATH": "custom/sources.yaml",
         "FROM_EMAIL": "custom-from@example.com",
         "TO_EMAIL": "custom-to@example.com",
     }
@@ -76,7 +76,7 @@ def test_load_config_local_with_env_vars() -> None:
         assert config.llm_candidate_max == 200
         assert config.final_select_max == 20
         assert config.final_select_max_per_domain == 5
-        assert config.sources_config_path == "custom/sources.json"
+        assert config.sources_config_path == "custom/sources.yaml"
         assert config.from_email == "custom-from@example.com"
         assert config.to_email == "custom-to@example.com"
 
@@ -109,11 +109,12 @@ def test_app_config_dataclass() -> None:
         dynamodb_cache_table="cache",
         dynamodb_history_table="history",
         bedrock_model_id="model-id",
+        bedrock_region="ap-northeast-1",
         bedrock_max_parallel=5,
         llm_candidate_max=150,
         final_select_max=12,
         final_select_max_per_domain=4,
-        sources_config_path="sources.json",
+        sources_config_path="sources.yaml",
         from_email="from@example.com",
         to_email="to@example.com",
     )

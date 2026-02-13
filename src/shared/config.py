@@ -26,6 +26,7 @@ class AppConfig:
         dynamodb_cache_table: DynamoDB キャッシュテーブル名
         dynamodb_history_table: DynamoDB 履歴テーブル名
         bedrock_model_id: Bedrock モデルID
+        bedrock_region: Bedrock リージョン
         bedrock_max_parallel: Bedrock 並列実行数
         llm_candidate_max: LLM 候補記事数上限
         final_select_max: 最終選抜記事数上限
@@ -41,6 +42,7 @@ class AppConfig:
     dynamodb_cache_table: str
     dynamodb_history_table: str
     bedrock_model_id: str
+    bedrock_region: str
     bedrock_max_parallel: int
     llm_candidate_max: int
     final_select_max: int
@@ -98,14 +100,13 @@ def _load_config_local() -> AppConfig:
             dynamodb_history_table=os.getenv(
                 "DYNAMODB_HISTORY_TABLE", "ai-curated-newsletter-history"
             ),
-            bedrock_model_id=os.getenv(
-                "BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0"
-            ),
+            bedrock_model_id=os.getenv("BEDROCK_MODEL_ID"),
+            bedrock_region=os.getenv("BEDROCK_REGION", "ap-northeast-1"),
             bedrock_max_parallel=int(os.getenv("BEDROCK_MAX_PARALLEL", "5")),
             llm_candidate_max=int(os.getenv("LLM_CANDIDATE_MAX", "150")),
             final_select_max=int(os.getenv("FINAL_SELECT_MAX", "12")),
             final_select_max_per_domain=int(os.getenv("FINAL_SELECT_MAX_PER_DOMAIN", "4")),
-            sources_config_path=os.getenv("SOURCES_CONFIG_PATH", "config/sources.json"),
+            sources_config_path=os.getenv("SOURCES_CONFIG_PATH", "config/sources.yaml"),
             from_email=os.getenv("FROM_EMAIL", "noreply@example.com"),
             to_email=os.getenv("TO_EMAIL", "recipient@example.com"),
         )

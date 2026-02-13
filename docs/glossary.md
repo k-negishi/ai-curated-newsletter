@@ -230,20 +230,18 @@ class JudgmentResult:
 **定義**: RSS/Atomフィードの収集元設定を管理するマスタデータ
 
 **説明**:
-Phase 1ではS3上のJSON設定ファイル（`sources.json`）として管理。Phase 2ではDynamoDBテーブルに移行予定。追加・削除はマスタの変更のみで完結し、コード改修は不要。
+Phase 1ではS3上のYAML設定ファイル（`sources.yaml`）として管理。Phase 2ではDynamoDBテーブルに移行予定。追加・削除はマスタの変更のみで完結し、コード改修は不要。
 
 **設定項目**:
-```json
-{
-  "source_id": "hacker_news",
-  "name": "Hacker News",
-  "feed_url": "https://news.ycombinator.com/rss",
-  "feed_type": "rss",
-  "priority": "high",
-  "timeout_seconds": 10,
-  "retry_count": 2,
-  "enabled": true
-}
+```yaml
+source_id: hacker_news
+name: Hacker News
+feed_url: https://news.ycombinator.com/rss
+feed_type: rss
+priority: high
+timeout_seconds: 10
+retry_count: 2
+enabled: true
 ```
 
 **関連用語**:
@@ -255,7 +253,7 @@ Phase 1ではS3上のJSON設定ファイル（`sources.json`）として管理�
 
 **実装箇所**: `src/repositories/source_master.py`
 
-**設定ファイル**: `config/sources.json` (Phase 1)
+**設定ファイル**: `config/sources.yaml` (Phase 1)
 
 **英語表記**: Source Master
 

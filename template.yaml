@@ -33,10 +33,10 @@ Resources:
         Variables:
           CACHE_TABLE_NAME: !Ref CacheTable
           HISTORY_TABLE_NAME: !Ref HistoryTable
-          SOURCES_CONFIG_PATH: config/sources.json
+          SOURCES_CONFIG_PATH: config/sources.yaml
           FROM_EMAIL: !Ref FromEmail
           TO_EMAIL: !Ref ToEmail
-          BEDROCK_MODEL_ID: anthropic.claude-3-5-sonnet-20241022-v2:0
+          BEDROCK_MODEL_ID: anthropic.claude-3-5-sonnet-20240620-v1:0
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref CacheTable
@@ -46,7 +46,7 @@ Resources:
             - Effect: Allow
               Action:
                 - bedrock:InvokeModel
-              Resource: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0'
+              Resource: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-5-sonnet*'
         - Statement:
             - Effect: Allow
               Action:

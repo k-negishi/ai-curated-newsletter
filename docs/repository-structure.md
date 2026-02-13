@@ -74,7 +74,7 @@ ai-curated-newsletter/
 │       ├── test_normal_flow.py           # 正常系フロー
 │       └── test_error_handling_flow.py   # 異常系フロー
 ├── config/                   # 設定ファイル
-│   └── sources.json          # 収集元マスタ（Phase 1）
+│   └── sources.yaml          # 収集元マスタ（Phase 1）
 ├── docs/                     # プロジェクトドキュメント
 │   ├── product-requirements.md
 │   ├── functional-design.md
@@ -484,7 +484,7 @@ tests/e2e/
 ### config/ (設定ファイルディレクトリ)
 
 **配置ファイル**:
-- `sources.json`: 収集元マスタ（Phase 1）
+- `sources.yaml`: 収集元マスタ（Phase 1）
 
 **Phase 2での拡張**:
 - DynamoDBテーブルに移行
@@ -585,7 +585,7 @@ tests/e2e/
 | 依存関係定義 | プロジェクトルート | `pyproject.toml` |
 | Lambda デプロイ用 | プロジェクトルート | `requirements.txt` |
 | AWS SAM テンプレート | プロジェクトルート | `template.yaml` |
-| 収集元マスタ | `config/` | `sources.json` |
+| 収集元マスタ | `config/` | `sources.yaml` |
 | Git除外設定 | プロジェクトルート | `.gitignore` |
 
 ## 命名規則

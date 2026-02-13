@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+import yaml
 from pydantic import ValidationError
 
 from src.models.source_config import SourceConfig
@@ -11,7 +12,7 @@ from src.models.source_config import SourceConfig
 class SourceMaster:
     """収集元マスタ.
 
-    設定ファイル（config/sources.json）から収集元設定を読み込む.
+    設定ファイル（config/sources.yaml または config/sources.json）から収集元設定を読み込む.
 
     Attributes:
         _sources: 収集元設定のリスト
@@ -21,23 +22,29 @@ class SourceMaster:
         """マスタを初期化する.
 
         Args:
-            config_path: 設定ファイルパス（JSON）
+            config_path: 設定ファイルパス（YAML または JSON）
 
         Raises:
             FileNotFoundError: 設定ファイルが見つからない場合
             ValidationError: 設定ファイルのバリデーションエラー
-            ValueError: JSONの解析エラー
+            ValueError: ファイル形式の解析エラー
         """
         config_path = Path(config_path)
 
         if not config_path.exists():
             raise FileNotFoundError(f"設定ファイルが見つかりません: {config_path}")
 
+        # ファイル拡張子に応じて読み込み方法を選択
         try:
             with open(config_path, encoding="utf-8") as f:
-                data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"JSONの解析に失敗しました: {config_path}") from e
+                if config_path.suffix in [".yaml", ".yml"]:
+                    data = yaml.safe_load(f)
+                elif config_path.suffix == ".json":
+                    data = json.load(f)
+                else:
+                    raise ValueError(f"サポートされていないファイル形式です: {config_path.suffix}")
+        except (json.JSONDecodeError, yaml.YAMLError) as e:
+            raise ValueError(f"ファイルの解析に失敗しました: {config_path}") from e
 
         # sources配列を取得
         if "sources" not in data:

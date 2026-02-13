@@ -1,0 +1,45 @@
+sources:
+  - source_id: hacker_news
+    name: Hacker News
+    feed_url: https://news.ycombinator.com/rss
+    feed_type: rss
+    priority: high
+    timeout_seconds: 15
+    retry_count: 3
+    enabled: true
+
+  - source_id: hatena_bookmark_tech
+    name: はてなブックマーク（テクノロジー）
+    feed_url: https://b.hatena.ne.jp/hotentry/it.rss
+    feed_type: rss
+    priority: high
+    timeout_seconds: 15
+    retry_count: 3
+    enabled: true
+
+  - source_id: zenn_trend
+    name: Zenn（トレンド）
+    feed_url: https://zenn.dev/feed
+    feed_type: rss
+    priority: medium
+    timeout_seconds: 10
+    retry_count: 2
+    enabled: true
+
+  - source_id: qiita_trend
+    name: Qiita（トレンド）
+    feed_url: https://qiita.com/popular-items/feed
+    feed_type: atom
+    priority: medium
+    timeout_seconds: 10
+    retry_count: 2
+    enabled: true
+
+  - source_id: aws_blog
+    name: AWS Blog
+    feed_url: https://aws.amazon.com/blogs/aws/feed/
+    feed_type: rss
+    priority: high
+    timeout_seconds: 15
+    retry_count: 3
+    enabled: true
