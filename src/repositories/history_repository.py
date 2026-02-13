@@ -20,18 +20,21 @@ class HistoryRepository:
     Attributes:
         _table: DynamoDBテーブルリソース
         _table_name: テーブル名
+        _dry_run: ドライランモード（true の場合、履歴保存をスキップ）
     """
 
-    def __init__(self, dynamodb_resource: Any, table_name: str) -> None:
+    def __init__(self, dynamodb_resource: Any, table_name: str, dry_run: bool = False) -> None:
         """リポジトリを初期化する.
 
         Args:
             dynamodb_resource: DynamoDBリソース（boto3.resource('dynamodb')）
             table_name: テーブル名
+            dry_run: ドライランモード（デフォルト: False）
         """
         self._dynamodb = dynamodb_resource
         self._table_name = table_name
         self._table = dynamodb_resource.Table(table_name)
+        self._dry_run = dry_run
 
     def _generate_pk(self, year: int, week: int) -> str:
         """年・週番号からパーティションキーを生成する.
@@ -71,12 +74,23 @@ class HistoryRepository:
     def save(self, summary: ExecutionSummary) -> None:
         """実行サマリをDynamoDBに保存する.
 
+        dry_run=true の場合、履歴保存をスキップします。
+
         Args:
             summary: 実行サマリ
 
         Raises:
             ClientError: DynamoDB操作に失敗した場合
         """
+        # dry_run=true の場合、履歴保存をスキップ
+        if self._dry_run:
+            logger.info(
+                "history_save_skipped",
+                run_id=summary.run_id,
+                reason="dry_run_mode_enabled",
+            )
+            return
+
         # 年・週番号を計算（ISO 8601 week date）
         iso_calendar = summary.executed_at.isocalendar()
         year = iso_calendar[0]

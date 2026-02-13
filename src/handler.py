@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import os
 import uuid
 from typing import Any
 
@@ -19,6 +18,7 @@ from src.services.formatter import Formatter
 from src.services.llm_judge import LlmJudge
 from src.services.normalizer import Normalizer
 from src.services.notifier import Notifier
+from src.shared.config import load_config
 from src.shared.logging.logger import configure_logging, get_logger
 from src.shared.utils.date_utils import now_utc
 
@@ -43,34 +43,29 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     logger.info("lambda_handler_start", run_id=run_id)
 
     try:
-        # イベント解析
-        dry_run = event.get("dry_run", False)
-        logger.info("event_parsed", dry_run=dry_run)
+        # 設定読み込み
+        config = load_config()
+        logger.info("config_loaded", environment=config.environment)
 
-        # 環境変数取得
-        # TODO(MVP): DynamoDB未セットアップのため一時的にコメントアウト
-        # Phase 2で有効化: DynamoDBテーブル作成後に以下を復元
-        # cache_table_name = os.environ.get("CACHE_TABLE_NAME", "ai-curated-newsletter-cache")
-        # history_table_name = os.environ.get("HISTORY_TABLE_NAME", "ai-curated-newsletter-history")
-        sources_config_path = os.environ.get("SOURCES_CONFIG_PATH", "config/sources.json")
-        from_email = os.environ.get("FROM_EMAIL", "noreply@example.com")
-        to_email = os.environ.get("TO_EMAIL", "recipient@example.com")
-        bedrock_model_id = os.environ.get(
-            "BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0"
-        )
+        # ログレベル設定（config から取得）
+        configure_logging(log_level=config.log_level, run_id=run_id)
+
+        # イベント解析と dry_run フラグ決定
+        # イベント内の dry_run フラグが設定されていれば優先、なければ環境変数から取得
+        dry_run = event.get("dry_run", config.dry_run)
+        logger.info("event_parsed", dry_run=dry_run)
 
         # AWS クライアント初期化
         # TODO(MVP): DynamoDB未セットアップのため一時的にコメントアウト
+        # Phase 2で有効化: 以下の2行を復元
         # dynamodb = boto3.resource("dynamodb")
+        # cache_repository = CacheRepository(dynamodb, config.dynamodb_cache_table)
+        # history_repository = HistoryRepository(dynamodb, config.dynamodb_history_table)
         bedrock_runtime = boto3.client("bedrock-runtime")
         ses = boto3.client("ses")
 
         # リポジトリ初期化
-        source_master = SourceMaster(sources_config_path)
-        # TODO(MVP): DynamoDB未セットアップのため一時的にコメントアウト
-        # Phase 2で有効化: 以下の2行を復元し、Noneの代入を削除
-        # cache_repository = CacheRepository(dynamodb, cache_table_name)
-        # history_repository = HistoryRepository(dynamodb, history_table_name)
+        source_master = SourceMaster(config.sources_config_path)
         cache_repository = None  # MVPフェーズではキャッシュ機能を無効化
         history_repository = None  # MVPフェーズでは履歴保存機能を無効化
 
@@ -79,15 +74,20 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         normalizer = Normalizer()
         deduplicator = Deduplicator(cache_repository)
         buzz_scorer = BuzzScorer()
-        candidate_selector = CandidateSelector(max_candidates=150)
+        candidate_selector = CandidateSelector(max_candidates=config.llm_candidate_max)
         llm_judge = LlmJudge(
             bedrock_client=bedrock_runtime,
             cache_repository=cache_repository,
-            model_id=bedrock_model_id,
+            model_id=config.bedrock_model_id,
         )
-        final_selector = FinalSelector(max_articles=12, max_per_domain=4)
+        final_selector = FinalSelector(
+            max_articles=config.final_select_max,
+            max_per_domain=config.final_select_max_per_domain,
+        )
         formatter = Formatter()
-        notifier = Notifier(ses, from_email=from_email, to_email=to_email)
+        notifier = Notifier(
+            ses, from_email=config.from_email, to_email=config.to_email, dry_run=dry_run
+        )
 
         # Orchestrator初期化
         orchestrator = Orchestrator(

@@ -97,6 +97,10 @@ class CacheRepository:
     def put(self, judgment: JudgmentResult) -> None:
         """判定結果をキャッシュに保存する.
 
+        注: dry_run=true の場合でも、キャッシュは保存されます。
+        これにより、テスト実行でも判定結果が永続化され、次回以降の
+        テスト実行でキャッシュが活用されます。
+
         Args:
             judgment: 判定結果
         """

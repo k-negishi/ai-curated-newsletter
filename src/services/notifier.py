@@ -33,22 +33,29 @@ class Notifier:
         _ses_client: SESクライアント
         _from_email: 送信元メールアドレス
         _to_email: 送信先メールアドレス
+        _dry_run: ドライランモード（true の場合メール送信をスキップ）
     """
 
-    def __init__(self, ses_client: Any, from_email: str, to_email: str) -> None:
+    def __init__(
+        self, ses_client: Any, from_email: str, to_email: str, dry_run: bool = False
+    ) -> None:
         """通知サービスを初期化する.
 
         Args:
             ses_client: SESクライアント（boto3.client('ses')）
             from_email: 送信元メールアドレス
             to_email: 送信先メールアドレス
+            dry_run: ドライランモード（デフォルト: False）
         """
         self._ses_client = ses_client
         self._from_email = from_email
         self._to_email = to_email
+        self._dry_run = dry_run
 
     def send(self, subject: str, body: str) -> NotificationResult:
         """メールを送信する.
+
+        dry_run=true の場合、メール送信をスキップします。
 
         Args:
             subject: メール件名
@@ -65,7 +72,17 @@ class Notifier:
             from_email=mask_email(self._from_email),
             to_email=mask_email(self._to_email),
             subject=subject,
+            dry_run=self._dry_run,
         )
+
+        # dry_run=true の場合、メール送信をスキップ
+        if self._dry_run:
+            logger.info(
+                "notification_skipped",
+                reason="dry_run_mode_enabled",
+                to_email=mask_email(self._to_email),
+            )
+            return NotificationResult(message_id="dry-run", sent_at=now_utc())
 
         try:
             # SES send_email
