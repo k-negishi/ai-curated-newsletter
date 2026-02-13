@@ -222,6 +222,4 @@ aws ses verify-email-identity --email-address your-email@example.com
 - https://github.com/GenerativeAgents/claude-code-book-chapter8
 - https://github.com/Jeffallan/claude-skills
 
-上記リポジトリはいずれも MIT License のもとで公開されています。  
-なお、これは参考元リポジトリのライセンス情報であり、本リポジトリ自体のライセンスを示すものではありません。  
-著作権表示およびライセンス表示は、各参考元リポジトリのライセンス表記に準拠します。
+上記リポジトリはいずれも MIT License で公開されています。  
