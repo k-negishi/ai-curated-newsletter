@@ -215,3 +215,13 @@ aws ses verify-email-identity --email-address your-email@example.com
 3. 申請フォームを記入して送信
 4. AWS審査後、本番モードに移行
 
+## 謝辞（参考元ライセンス情報）
+
+本プロジェクトは、以下のリポジトリのアイデア・構成・実装方針を参考にしています。
+
+- https://github.com/GenerativeAgents/claude-code-book-chapter8
+- https://github.com/Jeffallan/claude-skills
+
+上記リポジトリはいずれも MIT License のもとで公開されています。  
+なお、これは参考元リポジトリのライセンス情報であり、本リポジトリ自体のライセンスを示すものではありません。  
+著作権表示およびライセンス表示は、各参考元リポジトリのライセンス表記に準拠します。
