@@ -57,8 +57,8 @@ Resources:
         DailySchedule:
           Type: Schedule
           Properties:
-            Schedule: cron(0 9 * * ? *)
-            Description: Run newsletter daily at 09:00 UTC
+            Schedule: cron(0 0 * * ? *)  # 毎日JST 09:00 (UTC 00:00)
+            Description: 毎日JST 09:00にニュースレターを実行
             Enabled: true
 
   # DynamoDB Cache Table
