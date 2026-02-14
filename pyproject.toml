@@ -2,7 +2,7 @@
 name = "ai-curated-newsletter"
 version = "0.1.0"
 description = "AI-powered newsletter curation system"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 authors = [
     {name = "Kei"}
 ]
@@ -29,7 +29,7 @@ dev = [
 ]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.14"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
@@ -42,7 +42,7 @@ warn_no_return = true
 check_untyped_defs = true
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 100
 
 [tool.ruff.lint]

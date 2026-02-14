@@ -307,7 +307,7 @@ LLMは数値計算を行わない。
 
 ## 実行基盤
 
-* AWS Lambda（Python 3.12）
+* AWS Lambda（Python 3.14）
 * EventBridge（週2〜3回）
 * DynamoDB（キャッシュ）
 * Bedrock（LLM）
