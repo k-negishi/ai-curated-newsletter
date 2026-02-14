@@ -53,9 +53,10 @@ docs/development-guidelines.md
 コード実装時のルールと規約: ./guides/implementation.md
 
 含まれる内容:
-- Python規約（Python 3.12+）
+- Python規約（Python 3.14）
 - 型定義・命名規則（snake_case、型ヒント）
 - 関数設計とエラーハンドリング（dataclass、Exception）
+- 列挙型の使用（Enum）
 - コメント規約（Googleスタイルdocstring）
 - セキュリティとパフォーマンス
 - テストコード実装（pytest）

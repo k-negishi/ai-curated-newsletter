@@ -109,7 +109,9 @@ ls -la .steering/
 
 ### 関連ドキュメント
 
-- ステアリングファイル: `.steering/[日付]-[タスク名]/`
+- ステアリングファイル: `.steering/[実際のディレクトリ名]/`
+  - 例: `.steering/20260215-メールの体裁変更/`
+  - requirements.md, design.md, tasklist.md を参照
 - [その他の関連ドキュメント]
 
 🤖 Generated with Claude Code
@@ -160,6 +162,11 @@ git diff --stat HEAD~1 HEAD
 # 最新のステアリングディレクトリを取得
 ls -t .steering/ | head -1
 ```
+
+**重要**: ステアリングファイル名を明確に記録すること:
+- 最新のステアリングディレクトリ名を取得し、コメントに含める
+- 形式: `.steering/[YYYYMMDD]-[タスク名]/`
+- 例: `.steering/20260215-メールの体裁変更/`
 
 ### 手順4: 品質チェック結果の取得
 
