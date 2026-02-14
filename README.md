@@ -69,6 +69,15 @@ uv pip install -e ".[dev]"
 cp .env.example .env
 ```
 
+LLM 判定候補件数の運用目安:
+
+- `LLM_CANDIDATE_MAX=120`（推奨）
+- 実装上の上限は 150（`CandidateSelector`）
+- コスト試算の前提（目安）:
+  - Claude 3.5 Sonnet v2 単価: input `$6/1M`、output `$30/1M`
+  - 1記事あたり平均トークン: input `900`、output `140`
+  - 120件実行時の推定: 約 `$1.15/回`（週2回運用で約 `$9.22/月`）
+
 ## ローカル実行
 
 ### 推奨: Python スクリプトで直接実行

@@ -19,6 +19,7 @@ from src.services.llm_judge import LlmJudge
 from src.services.normalizer import Normalizer
 from src.services.notifier import Notifier
 from src.shared.logging.logger import get_logger
+from src.shared.utils.bedrock_cost_estimator import estimate_bedrock_cost_usd
 
 logger = get_logger(__name__)
 
@@ -231,8 +232,8 @@ class Orchestrator:
             logger.info("step8_start", step="save_history")
             execution_time = time.time() - start_time
 
-            # コスト推定（簡易版: LLM判定件数 * 単価）
-            estimated_cost = llm_judged_count * 0.01  # 仮の単価
+            # コスト推定（トークン単価ベース）
+            estimated_cost = estimate_bedrock_cost_usd(llm_judged_count)
 
             summary = ExecutionSummary(
                 run_id=run_id,
