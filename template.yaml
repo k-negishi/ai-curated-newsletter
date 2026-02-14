@@ -54,17 +54,11 @@ Resources:
                 - ses:SendRawEmail
               Resource: '*'
       Events:
-        TuesdaySchedule:
+        DailySchedule:
           Type: Schedule
           Properties:
-            Schedule: cron(0 9 ? * TUE *)
-            Description: Run newsletter on Tuesday at 09:00 UTC
-            Enabled: true
-        FridaySchedule:
-          Type: Schedule
-          Properties:
-            Schedule: cron(0 9 ? * FRI *)
-            Description: Run newsletter on Friday at 09:00 UTC
+            Schedule: cron(0 9 * * ? *)
+            Description: Run newsletter daily at 09:00 UTC
             Enabled: true
 
   # DynamoDB Cache Table
