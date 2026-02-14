@@ -1,5 +1,5 @@
 ---
-description: issue や指示からステアリングファイルを対話的に作成
+description: issue や指示を調査してからステアリングファイルを対話的に作成
 argument-hint: 機能名 または GitHub issue URL
 ---
 
@@ -24,6 +24,7 @@ argument-hint: 機能名 または GitHub issue URL
    - **GitHub issue URL の場合:**
      - パターン: `https://github.com/{owner}/{repo}/issues/{number}`
      - `gh issue view {number} --json title,body,labels --jq '{title: .title, body: .body, labels: [.labels[].name]}'` で issue 内容を取得
+     - issuecomment もすべて取得
      - タイトルから機能名を生成:
        - **日本語の場合**: そのまま保持（小文字化しない）、スペースを削除
        - **英語の場合**: 小文字化、スペースをハイフンに変換
@@ -43,14 +44,6 @@ argument-hint: 機能名 または GitHub issue URL
    - ステアリングディレクトリパス: `.steering/[日付]-[機能名]/`
    - issue URL: `[引数が URL の場合は保持]`
    - issue 番号: `[URL から抽出、または null]`
-
-3. **ステアリングディレクトリを作成する:**
-   - 上記パスでディレクトリを作成
-
-4. **3つの空ファイルを作成する:**
-   - `[ステアリングディレクトリパス]/requirements.md`
-   - `[ステアリングディレクトリパス]/design.md`
-   - `[ステアリングディレクトリパス]/tasklist.md`
 
 ## ステップ2: プロジェクト理解
 
@@ -85,11 +78,96 @@ argument-hint: 機能名 または GitHub issue URL
 3. **要件が明確な場合:**
    - このステップをスキップして次へ
 
-## ステップ5: 計画フェーズ (ステアリングファイル生成)
+## ステップ4.5: タスクボリューム判定とファイル数選択 (対話的確認)
+
+1. **タスクボリュームの判定:**
+
+   以下の観点から総合的に判定:
+   - issue本文の長さと複雑さ
+   - 関連ファイルの数（ステップ3の検索結果から）
+   - 新規機能追加 vs 既存機能修正 vs バグフィックス
+   - アーキテクチャ変更の有無
+   - 技術選択の複雑さ
+
+   **判定基準:**
+
+   - **大規模（3ファイル推奨）**: requirements + design + tasklist
+     - 新機能追加
+     - 複数ファイルにまたがる変更（3ファイル以上）
+     - アーキテクチャ変更
+     - 要件が複雑で詳細な記録が必要
+     - 技術選択が複数ある
+
+   - **中規模（2ファイル推奨）**: design + tasklist
+     - 既存機能の拡張
+     - 1〜2ファイルの修正
+     - 要件が明確だが実装に工夫が必要
+     - 設計判断が必要だが要件は明確
+
+   - **小規模（1ファイル推奨）**: tasklist のみ
+     - バグフィックス
+     - 単純な機能追加
+     - 単一ファイルの修正
+     - 要件が極めて明確で実装が単純
+     - 既存パターンの踏襲のみ
+
+2. **ユーザーに選択を促す:**
+
+   `AskUserQuestion` ツールを使用して、推奨度を示しながら選択肢を提示:
+
+   ```
+   質問: 「このタスクに必要なステアリングファイルの範囲を選択してください」
+   header: "ファイル範囲"
+
+   選択肢:
+   - label: "【大】requirements + design + tasklist (推奨)" (判定結果が大規模の場合)
+     description: "新機能追加や複数ファイルにまたがる変更に適しています。要件、設計、タスクをすべて詳細に記録します。"
+
+   - label: "【中】design + tasklist"
+     description: "既存機能の拡張や1〜2ファイルの修正に適しています。要件は明確なので設計とタスクのみ記録します。"
+
+   - label: "【小】tasklist のみ"
+     description: "バグフィックスや単純な機能追加に適しています。タスクリストのみで進められます。"
+   ```
+
+   **注意**: 推奨度は判定結果に基づいて決定し、推奨する選択肢のlabelに「(推奨)」を追加する
+
+3. **選択結果を保存:**
+
+   ユーザーの選択に基づいて、以下の変数を設定:
+   - `create_requirements`: true/false
+   - `create_design`: true/false
+   - `create_tasklist`: true (常にtrue)
+
+## ステップ5: ステアリングファイル作成準備
+
+1. **ステアリングディレクトリを作成する:**
+   - ステップ1で確立したパスでディレクトリを作成
+
+2. **選択されたファイルのみ作成する:**
+
+   ステップ4.5の選択結果に基づいて、以下のファイルを作成:
+
+   - `create_requirements == true` の場合:
+     - `[ステアリングディレクトリパス]/requirements.md` (空ファイル)
+
+   - `create_design == true` の場合:
+     - `[ステアリングディレクトリパス]/design.md` (空ファイル)
+
+   - `create_tasklist == true` の場合 (常にtrue):
+     - `[ステアリングディレクトリパス]/tasklist.md` (空ファイル)
+
+## ステップ6: 計画フェーズ (ステアリングファイル生成)
 
 1. **`Skill('steering')` を計画モードで実行:**
-   - ステップ1で作成した3つのファイルの内容を生成
-   - `requirements.md`, `design.md`, `tasklist.md`
+
+   選択されたファイル範囲を指定して実行:
+
+   - **【大】の場合**: `Skill('steering', args='mode=plan files=requirements,design,tasklist')`
+   - **【中】の場合**: `Skill('steering', args='mode=plan files=design,tasklist')`
+   - **【小】の場合**: `Skill('steering', args='mode=plan files=tasklist')`
+
+   これにより、ステップ5で作成したファイルの内容が生成されます
 
 2. **requirements.md に以下を追加:**
    - **issue との紐付け** (issue URL が存在する場合):
@@ -127,20 +205,26 @@ argument-hint: 機能名 または GitHub issue URL
        - [ ] RED: テストを先に書く
        - [ ] GREEN: 実装してテストをパスさせる
        - [ ] REFACTOR: コードを改善
+     - [ ] lint/format/型チェックがすべて通る
      ```
 
-## ステップ6: 完了確認
+## ステップ7: 完了確認
 
 1. 生成されたステアリングファイルの内容をユーザーに提示
 
 2. 以下のメッセージを表示:
+
+   作成されたファイルのリストは選択に応じて動的に変更:
+
    ```
    ステアリングファイルの作成が完了しました。
 
    作成されたファイル:
-   - [ステアリングディレクトリパス]/requirements.md
-   - [ステアリングディレクトリパス]/design.md
-   - [ステアリングディレクトリパス]/tasklist.md
+   [選択されたファイルのみリスト表示]
+   例:
+   - [ステアリングディレクトリパス]/requirements.md (【大】の場合のみ)
+   - [ステアリングディレクトリパス]/design.md (【大】【中】の場合のみ)
+   - [ステアリングディレクトリパス]/tasklist.md (常に作成)
 
    内容を確認してください。
 

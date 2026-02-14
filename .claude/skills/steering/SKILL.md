@@ -28,14 +28,42 @@ allowed-tools: Read, Write
 ### 目的
 新しい機能や変更のためのステアリングファイルを作成します。
 
+### 引数（オプション）
+
+スキル呼び出し時に`args`パラメータで以下を指定可能:
+
+- `mode=plan`: 計画モードを明示（省略可）
+- `files=<ファイルリスト>`: 作成するファイルを指定
+
+  **ファイルリストの形式**: カンマ区切り
+  - `files=requirements,design,tasklist`: 3つすべて作成（デフォルト）
+  - `files=design,tasklist`: design と tasklist のみ作成
+  - `files=tasklist`: tasklist のみ作成
+
+  **例**:
+  - `Skill('steering', args='mode=plan files=requirements,design,tasklist')`
+  - `Skill('steering', args='mode=plan files=design,tasklist')`
+  - `Skill('steering', args='mode=plan files=tasklist')`
+
 ### 手順
 
-1. **ステアリングディレクトリの確認**
+1. **引数の解析**
+
+   `args`パラメータから`files`を抽出:
+   - 指定がない場合: デフォルトで`requirements,design,tasklist`（3つすべて）
+   - 指定がある場合: 指定されたファイルのみ作成
+
+   作成するファイルのフラグを設定:
+   - `create_requirements`: `files`に`requirements`が含まれている場合`true`
+   - `create_design`: `files`に`design`が含まれている場合`true`
+   - `create_tasklist`: `files`に`tasklist`が含まれている場合`true`（通常は常に`true`）
+
+2. **ステアリングディレクトリの確認**
    ```
    現在の日付を取得し、`.steering/[YYYYMMDD]-[機能名]/` の形式でディレクトリを作成
    ```
 
-2. **永続ドキュメントの確認**
+3. **永続ドキュメントの確認**
    - `docs/product-requirements.md`
    - `docs/functional-design.md`
    - `docs/architecture.md`
@@ -44,17 +72,37 @@ allowed-tools: Read, Write
 
    これらを読んで、プロジェクトの方針を理解する
 
-3. **テンプレートからファイル作成**
+4. **テンプレートからファイル作成**
 
-   以下のテンプレートを読み込み、プレースホルダーを具体的な内容に置き換えてファイルを作成:
+   ステップ1で設定したフラグに基づいて、選択的にファイルを作成:
 
-   - `.claude/skills/steering/templates/requirements.md` → `.steering/[日付]-[機能名]/requirements.md`
-   - `.claude/skills/steering/templates/design.md` → `.steering/[日付]-[機能名]/design.md`
-   - `.claude/skills/steering/templates/tasklist.md` → `.steering/[日付]-[機能名]/tasklist.md`
+   - `create_requirements == true` の場合:
+     - `.claude/skills/steering/templates/requirements.md` → `.steering/[日付]-[機能名]/requirements.md`
 
-4. **tasklist.mdの詳細化**
+   - `create_design == true` の場合:
+     - `.claude/skills/steering/templates/design.md` → `.steering/[日付]-[機能名]/design.md`
 
-   requirements.mdとdesign.mdに基づいて、tasklist.mdを詳細化:
+   - `create_tasklist == true` の場合:
+     - `.claude/skills/steering/templates/tasklist.md` → `.steering/[日付]-[機能名]/tasklist.md`
+
+   テンプレートを読み込み、プレースホルダーを具体的な内容に置き換えて作成します。
+
+5. **tasklist.mdの詳細化**
+
+   tasklist.mdを作成した場合、詳細化を行う:
+
+   - **requirements.mdとdesign.mdが両方存在する場合**:
+     - 両方の内容に基づいてtasklist.mdを詳細化
+
+   - **design.mdのみ存在する場合**:
+     - design.mdの内容に基づいてtasklist.mdを詳細化
+     - 要件は既知として、実装タスクに集中
+
+   - **tasklist.mdのみの場合**:
+     - 既存の要件と設計を前提に、実装タスクのみを記述
+     - タスクは具体的かつ実行可能な単位で記述
+
+   詳細化の内容:
    - 各フェーズのタスクを具体的に記述
    - サブタスクも明確に
    - 実装の順序を明記
