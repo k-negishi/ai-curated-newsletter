@@ -51,6 +51,7 @@ profile:
     - 5G
     - 6G
     - RAG
+    - Rails
 
 # 判定基準の定義
 criteria:
