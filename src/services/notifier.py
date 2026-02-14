@@ -52,7 +52,7 @@ class Notifier:
         self._to_email = to_email
         self._dry_run = dry_run
 
-    def send(self, subject: str, body: str) -> NotificationResult:
+    def send(self, subject: str, body: str, html_body: str | None = None) -> NotificationResult:
         """メールを送信する.
 
         dry_run=true の場合、メール送信をスキップします。
@@ -60,6 +60,7 @@ class Notifier:
         Args:
             subject: メール件名
             body: メール本文（プレーンテキスト）
+            html_body: メール本文（HTML、任意）
 
         Returns:
             通知結果
@@ -86,12 +87,18 @@ class Notifier:
 
         try:
             # SES send_email
+            message_body: dict[str, dict[str, str]] = {
+                "Text": {"Data": body, "Charset": "UTF-8"},
+            }
+            if html_body is not None:
+                message_body["Html"] = {"Data": html_body, "Charset": "UTF-8"}
+
             response = self._ses_client.send_email(
                 Source=self._from_email,
                 Destination={"ToAddresses": [self._to_email]},
                 Message={
                     "Subject": {"Data": subject, "Charset": "UTF-8"},
-                    "Body": {"Text": {"Data": body, "Charset": "UTF-8"}},
+                    "Body": message_body,
                 },
             )
 

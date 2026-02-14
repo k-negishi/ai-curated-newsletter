@@ -141,7 +141,6 @@ class Orchestrator:
 
         try:
             # Step 1: 収集・正規化
-            logger.info("step1_start", step="collect_and_normalize")
             collection_result = await self._collector.collect()
             collected_count = len(collection_result.articles)
             logger.info(
@@ -154,7 +153,6 @@ class Orchestrator:
             logger.info("step1_complete", normalized_count=len(normalized_articles))
 
             # Step 2: 重複排除
-            logger.info("step2_start", step="deduplicate")
             dedup_result = self._deduplicator.deduplicate(normalized_articles)
             deduped_count = len(dedup_result.unique_articles)
             cache_hit_count = dedup_result.cached_count
@@ -166,19 +164,16 @@ class Orchestrator:
             )
 
             # Step 3: Buzzスコア計算
-            logger.info("step3_start", step="calculate_buzz_scores")
             buzz_scores = await self._buzz_scorer.calculate_scores(dedup_result.unique_articles)
             logger.info("step3_complete", score_count=len(buzz_scores))
 
             # Step 4: 候補選定
-            logger.info("step4_start", step="select_candidates")
             selection_result = self._candidate_selector.select(
                 dedup_result.unique_articles, buzz_scores
             )
             logger.info("step4_complete", candidate_count=len(selection_result.candidates))
 
             # Step 5: LLM判定
-            logger.info("step5_start", step="llm_judgment")
             judgment_result = await self._llm_judge.judge_batch(selection_result.candidates)
             llm_judged_count = len(judgment_result.judgments)
             logger.info(
@@ -188,7 +183,6 @@ class Orchestrator:
             )
 
             # Step 6: 最終選定
-            logger.info("step6_start", step="final_selection")
             final_result = self._final_selector.select(judgment_result.judgments)
             final_selected_count = len(final_result.selected_articles)
             logger.info("step6_complete", selected_count=final_selected_count)
@@ -199,8 +193,6 @@ class Orchestrator:
             if final_selected_count == 0:
                 logger.warning("no_articles_to_notify")
                 # 記事がない場合でも履歴は保存
-            elif dry_run:
-                logger.info("dry_run_mode", message="Skipping notification")
             else:
                 # メール本文生成
                 mail_body = self._formatter.format(
@@ -216,17 +208,27 @@ class Orchestrator:
                     executed_at=executed_at,
                 )
 
-                # メール送信
-                subject = self._build_newsletter_subject(executed_at)
-                notification_result = self._notifier.send(
-                    subject=subject, body=mail_body, html_body=mail_html_body
-                )
-                notification_sent = True
-                logger.info(
-                    "step7_complete",
-                    message_id=notification_result.message_id,
-                    notification_sent=notification_sent,
-                )
+                if dry_run:
+                    logger.info("dry_run_mode", message="Showing formatted output")
+                    # dry_runモードでもフォーマット結果を表示
+                    print("\n" + "=" * 80)
+                    print("📧 フォーマット結果（dry_runモード、メール送信なし）")
+                    print("=" * 80)
+                    print(mail_body)
+                    print("=" * 80 + "\n")
+                    logger.info("step7_complete", notification_sent=notification_sent)
+                else:
+                    # メール送信
+                    subject = self._build_newsletter_subject(executed_at)
+                    notification_result = self._notifier.send(
+                        subject=subject, body=mail_body, html_body=mail_html_body
+                    )
+                    notification_sent = True
+                    logger.info(
+                        "step7_complete",
+                        message_id=notification_result.message_id,
+                        notification_sent=notification_sent,
+                    )
 
             # Step 8: 履歴保存
             logger.info("step8_start", step="save_history")
