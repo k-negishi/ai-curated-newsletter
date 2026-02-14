@@ -93,12 +93,16 @@ def test_interest_profile_format_output() -> None:
 
     # Assert - プロファイル整形出力の検証
     assert len(profile_text) > 0
+    if interest_profile.max_interest:
+        assert "**最高関心を持つトピック**:" in profile_text
     if interest_profile.high_interest:
         assert "**強い関心を持つトピック**:" in profile_text
     if interest_profile.medium_interest:
         assert "**中程度の関心を持つトピック**:" in profile_text
-    if interest_profile.low_priority:
-        assert "**低優先度のトピック**:" in profile_text
+    if interest_profile.low_interest:
+        assert "**低関心のトピック**:" in profile_text
+    if interest_profile.ignore_interest:
+        assert "**関心外のトピック**:" in profile_text
 
     # Assert - 判定基準整形出力の検証
     assert len(criteria_text) > 0

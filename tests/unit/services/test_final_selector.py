@@ -33,7 +33,7 @@ class TestFinalSelector:
             interest_label=interest_label,
             buzz_label=buzz_label,
             confidence=confidence,
-            reason="Test reason",
+            summary="Test reason",
             model_id="test-model",
             judged_at=datetime.now(timezone.utc),
             published_at=datetime(2026, 2, 13, 12, 0, 0, tzinfo=timezone.utc),

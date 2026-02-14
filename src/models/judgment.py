@@ -44,11 +44,11 @@ class JudgmentResult:
     Attributes:
         url: 記事URL（キャッシュキー）
         title: 記事タイトル
-        description: 記事の概要（最大800文字）
+        description: 記事の概要（最大800文字、RSS/Atomから取得、LLMプロンプトの入力として使用）
         interest_label: 関心度ラベル
         buzz_label: 話題性ラベル
         confidence: 信頼度（0.0-1.0）
-        reason: 判定理由（最大200文字）
+        summary: LLM生成の要約（最大300文字、メール表示用）
         model_id: 使用したLLMモデルID
         judged_at: 判定日時（UTC）
         tags: 記事タグ（例: ["Kotlin", "Claude"]）
@@ -61,7 +61,7 @@ class JudgmentResult:
     interest_label: InterestLabel
     buzz_label: BuzzLabel
     confidence: float
-    reason: str
+    summary: str
     model_id: str
     judged_at: datetime
     published_at: datetime

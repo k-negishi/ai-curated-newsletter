@@ -35,9 +35,11 @@ def mock_interest_profile() -> InterestProfile:
     }
     return InterestProfile(
         summary="テストプロファイル",
+        max_interest=[],
         high_interest=["AI/ML"],
         medium_interest=[],
-        low_priority=[],
+        low_interest=[],
+        ignore_interest=[],
         criteria=criteria,
     )
 
@@ -82,13 +84,13 @@ async def test_judgment_flow_success(
     response1_body.read.return_value = (
         b'{"content": [{"text": "{\\"interest_label\\": \\"ACT_NOW\\", '
         b'\\"buzz_label\\": \\"HIGH\\", \\"confidence\\": 0.9, '
-        b'\\"reason\\": \\"Important news\\"}"}]}'
+        b'\\"summary\\": \\"Important news\\"}"}]}'
     )
     response2_body = Mock()
     response2_body.read.return_value = (
         b'{"content": [{"text": "{\\"interest_label\\": \\"THINK\\", '
         b'\\"buzz_label\\": \\"MID\\", \\"confidence\\": 0.8, '
-        b'\\"reason\\": \\"Useful tutorial\\"}"}]}'
+        b'\\"summary\\": \\"Useful tutorial\\"}"}]}'
     )
     mock_bedrock.invoke_model.side_effect = [
         {"body": response1_body},
