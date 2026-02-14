@@ -76,17 +76,21 @@ class InterestMaster:
 
         self._profile = InterestProfile(
             summary=profile_data.get("summary", ""),
+            max_interest=profile_data.get("max_interest", []),
             high_interest=profile_data.get("high_interest", []),
             medium_interest=profile_data.get("medium_interest", []),
-            low_priority=profile_data.get("low_priority", []),
+            low_interest=profile_data.get("low_interest", []),
+            ignore_interest=profile_data.get("ignore_interest", []),
             criteria=criteria,
         )
 
         logger.info(
             "interest_profile_loaded",
+            max_interest_count=len(self._profile.max_interest),
             high_interest_count=len(self._profile.high_interest),
             medium_interest_count=len(self._profile.medium_interest),
-            low_priority_count=len(self._profile.low_priority),
+            low_interest_count=len(self._profile.low_interest),
+            ignore_interest_count=len(self._profile.ignore_interest),
         )
 
         return self._profile

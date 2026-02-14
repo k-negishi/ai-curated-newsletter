@@ -10,11 +10,11 @@ from src.models.article import Article
 from src.repositories.interest_master import InterestMaster
 from src.repositories.source_master import SourceMaster
 from src.services.buzz_scorer import BuzzScorer
-from src.services.social_proof_fetcher import SocialProofFetcher
+from src.services.multi_source_social_proof_fetcher import MultiSourceSocialProofFetcher
 
 
 class TestBuzzScorerIntegration:
-    """BuzzScorerの統合テスト."""
+    """BuzzScorerの統合テスト（4指標統合版）."""
 
     @pytest.fixture
     def interest_profile(self):
@@ -29,8 +29,8 @@ class TestBuzzScorerIntegration:
 
     @pytest.fixture
     def social_proof_fetcher(self):
-        """SocialProofFetcherのモックを返す."""
-        mock_fetcher = Mock(spec=SocialProofFetcher)
+        """MultiSourceSocialProofFetcherのモックを返す."""
+        mock_fetcher = Mock(spec=MultiSourceSocialProofFetcher)
         mock_fetcher.fetch_batch = AsyncMock(return_value={})
         return mock_fetcher
 
@@ -55,9 +55,9 @@ class TestBuzzScorerIntegration:
             collected_at=datetime.now(timezone.utc),
         )
 
-        # SocialProofFetcherのモック設定（はてブ25件）
+        # MultiSourceSocialProofFetcherのモック設定（4指標統合スコア: 25）
         social_proof_fetcher.fetch_batch.return_value = {
-            "https://zenn.dev/example/articles/ai-coding-test": 25,
+            "https://zenn.dev/example/articles/ai-coding-test": 25.0,
         }
 
         scores = await buzz_scorer.calculate_scores([article])
@@ -68,14 +68,14 @@ class TestBuzzScorerIntegration:
         # 各要素スコアが正しく計算されていることを確認
         assert buzz_score.recency_score == 100.0  # 今日の記事
         assert buzz_score.consensus_score == 20.0  # 1ソース（1 * 20）
-        assert buzz_score.social_proof_score == 50.0  # はてブ25件（10-49件: 50点）
+        assert buzz_score.social_proof_score == 25.0  # 4指標統合スコア
         assert buzz_score.interest_score == 100.0  # AI Coding（high_interest一致）
         assert buzz_score.authority_score == 50.0  # Zenn（MEDIUM）
 
-        # 総合スコアが正しく計算されていることを確認
-        # (100 * 0.25) + (20 * 0.20) + (50 * 0.20) + (100 * 0.25) + (50 * 0.10)
-        # = 25 + 4 + 10 + 25 + 5 = 69
-        assert buzz_score.total_score == 69.0
+        # 総合スコアが正しく計算されていることを確認（SNS重視版）
+        # (100 * 0.20) + (20 * 0.15) + (25 * 0.35) + (100 * 0.25) + (50 * 0.05)
+        # = 20 + 3 + 8.75 + 25 + 2.5 = 59.25
+        assert buzz_score.total_score == 59.25
 
     @pytest.mark.asyncio
     async def test_no_single_element_dominates(self, buzz_scorer, social_proof_fetcher):
@@ -91,19 +91,19 @@ class TestBuzzScorerIntegration:
             collected_at=datetime.now(timezone.utc),
         )
 
-        # SocialProofFetcherのモック設定（はてブ0件）
+        # MultiSourceSocialProofFetcherのモック設定（統合スコア: 0）
         social_proof_fetcher.fetch_batch.return_value = {
-            "https://example.com/new-but-boring": 0,
+            "https://example.com/new-but-boring": 0.0,
         }
 
         scores = await buzz_scorer.calculate_scores([article1])
         buzz_score1 = scores[article1.normalized_url]
 
-        # Recency 100点でも、総合スコアは100点にならない
-        # (100 * 0.25) + (20 * 0.20) + (0 * 0.20) + (40 * 0.25) + (50 * 0.10)
-        # = 25 + 4 + 0 + 10 + 5 = 44
+        # Recency 100点でも、総合スコアは100点にならない（SNS重視版）
+        # (100 * 0.20) + (20 * 0.15) + (0 * 0.35) + (20 * 0.25) + (50 * 0.05)
+        # = 20 + 3 + 0 + 5 + 2.5 = 30.5
         assert buzz_score1.total_score < 100.0
-        assert buzz_score1.total_score == 44.0
+        assert buzz_score1.total_score == 30.5
 
         # ケース2: SocialProofのみ高い記事（その他は低い）
         article2 = Article(
@@ -116,19 +116,19 @@ class TestBuzzScorerIntegration:
             collected_at=datetime.now(timezone.utc),
         )
 
-        # SocialProofFetcherのモック設定（はてブ150件）
+        # MultiSourceSocialProofFetcherのモック設定（統合スコア: 100）
         social_proof_fetcher.fetch_batch.return_value = {
-            "https://example.com/old-but-popular": 150,
+            "https://example.com/old-but-popular": 100.0,
         }
 
         scores = await buzz_scorer.calculate_scores([article2])
         buzz_score2 = scores[article2.normalized_url]
 
-        # SocialProof 100点でも、総合スコアは100点にならない
-        # (100 * 0.25) + (20 * 0.20) + (100 * 0.20) + (40 * 0.25) + (50 * 0.10)
-        # = 25 + 4 + 20 + 10 + 5 = 64
+        # SocialProof 100点でも、総合スコアは100点にならない（SNS重視版）
+        # (100 * 0.20) + (20 * 0.15) + (100 * 0.35) + (20 * 0.25) + (50 * 0.05)
+        # = 20 + 3 + 35 + 5 + 2.5 = 65.5
         assert buzz_score2.total_score < 100.0
-        assert buzz_score2.total_score == 64.0
+        assert buzz_score2.total_score == 65.5
 
     @pytest.mark.asyncio
     async def test_no_missing_important_articles(self, buzz_scorer, social_proof_fetcher):
@@ -177,38 +177,38 @@ class TestBuzzScorerIntegration:
             collected_at=datetime.now(timezone.utc),
         )
 
-        # SocialProofFetcherのモック設定
+        # MultiSourceSocialProofFetcherのモック設定（4指標統合スコア）
         social_proof_fetcher.fetch_batch.return_value = {
-            "https://qiita.com/official-blog": 5,  # 低SocialProof
-            "https://zenn.dev/ai-article": 5,  # 低SocialProof
-            "https://zenn.dev/other-article": 5,  # 低SocialProof
-            "https://qiita.com/popular-article": 200,  # 高SocialProof
+            "https://qiita.com/official-blog": 5.0,  # 低統合スコア
+            "https://zenn.dev/ai-article": 5.0,  # 低統合スコア
+            "https://zenn.dev/other-article": 5.0,  # 低統合スコア
+            "https://qiita.com/popular-article": 100.0,  # 高統合スコア
         }
 
         articles = [article_official, article_interest, article_no_interest, article_popular]
         scores = await buzz_scorer.calculate_scores(articles)
 
-        # ケース1検証: 公式記事が低SocialProofでも一定スコアを維持
+        # ケース1検証: 公式記事が低SocialProofでも一定スコアを維持（SNS重視版）
         official_score = scores[article_official.normalized_url]
-        # (100 * 0.25) + (20 * 0.20) + (20 * 0.20) + (40 * 0.25) + (50 * 0.10)
-        # = 25 + 4 + 4 + 10 + 5 = 48
-        assert official_score.total_score >= 40.0  # 一定スコアを維持
+        # (100 * 0.20) + (20 * 0.15) + (5 * 0.35) + (20 * 0.25) + (50 * 0.05)
+        # = 20 + 3 + 1.75 + 5 + 2.5 = 32.25
+        assert official_score.total_score >= 30.0  # 一定スコアを維持（基準を調整）
 
-        # ケース2検証: Interest一致記事が同条件（同じSocialProof）で優先
+        # ケース2検証: Interest一致記事が同条件（同じSocialProof）で優先（SNS重視版）
         interest_score = scores[article_interest.normalized_url]
         no_interest_score = scores[article_no_interest.normalized_url]
         # Interest一致記事のほうが高スコア
         assert interest_score.total_score > no_interest_score.total_score
-        # interest_score: (100 * 0.25) + (20 * 0.20) + (20 * 0.20) + (100 * 0.25) + (50 * 0.10) = 63
+        # interest_score: (100 * 0.20) + (20 * 0.15) + (5 * 0.35) + (100 * 0.25) + (50 * 0.05) = 52.25
         #   PostgreSQL -> high_interest一致 (データベース設計)
-        #   social_proof_count=5 -> 20点
-        # no_interest_score: (100 * 0.25) + (20 * 0.20) + (20 * 0.20) + (40 * 0.25) + (50 * 0.10) = 48
-        assert interest_score.total_score == 63.0
-        assert no_interest_score.total_score == 48.0
+        #   social_proof_score=5.0 (統合スコア)
+        # no_interest_score: (100 * 0.20) + (20 * 0.15) + (5 * 0.35) + (20 * 0.25) + (50 * 0.05) = 32.25
+        assert interest_score.total_score == 52.25
+        assert no_interest_score.total_score == 32.25
 
-        # ケース3検証: 話題記事が興味外でも一定スコアを維持
+        # ケース3検証: 話題記事が興味外でも一定スコアを維持（SNS重視版）
         popular_score = scores[article_popular.normalized_url]
-        # (100 * 0.25) + (20 * 0.20) + (100 * 0.20) + (40 * 0.25) + (50 * 0.10)
-        # = 25 + 4 + 20 + 10 + 5 = 64
+        # (100 * 0.20) + (20 * 0.15) + (100 * 0.35) + (20 * 0.25) + (50 * 0.05)
+        # = 20 + 3 + 35 + 5 + 2.5 = 65.5
         assert popular_score.total_score >= 60.0  # 一定スコアを維持
-        assert popular_score.total_score == 64.0
+        assert popular_score.total_score == 65.5

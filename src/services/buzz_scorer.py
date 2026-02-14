@@ -7,7 +7,7 @@ from src.models.buzz_score import BuzzScore
 from src.models.interest_profile import InterestProfile
 from src.models.source_config import AuthorityLevel
 from src.repositories.source_master import SourceMaster
-from src.services.social_proof_fetcher import SocialProofFetcher
+from src.services.multi_source_social_proof_fetcher import MultiSourceSocialProofFetcher
 from src.shared.logging.logger import get_logger
 from src.shared.utils.date_utils import now_utc
 
@@ -20,32 +20,32 @@ class BuzzScorer:
     スコア計算式:
     - recency_score = max(100 - (days_old * 10), 0)
     - consensus_score = min(source_count * 20, 100)
-    - social_proof_score = はてブ数に応じたスコア（0, 20, 50, 70, 100）
+    - social_proof_score = 4指標統合スコア（yamadashy, Hatena, Zenn, Qiita）（0-100）
     - interest_score = InterestProfileとのマッチング度（0-100）
     - authority_score = authority_levelに応じたスコア（0, 50, 80, 100）
-    - total_score = (recency × 0.25) + (consensus × 0.20) + (social_proof × 0.20)
-                  + (interest × 0.25) + (authority × 0.10)
+    - total_score = (recency × 0.20) + (consensus × 0.15) + (social_proof × 0.35)
+                  + (interest × 0.25) + (authority × 0.05)
     """
 
-    # 重み配分
-    WEIGHT_RECENCY = 0.25
-    WEIGHT_CONSENSUS = 0.20
-    WEIGHT_SOCIAL_PROOF = 0.20
+    # 重み配分（SNS反応を重視）
+    WEIGHT_RECENCY = 0.20
+    WEIGHT_CONSENSUS = 0.15
+    WEIGHT_SOCIAL_PROOF = 0.35
     WEIGHT_INTEREST = 0.25
-    WEIGHT_AUTHORITY = 0.10
+    WEIGHT_AUTHORITY = 0.05
 
     def __init__(
         self,
         interest_profile: InterestProfile,
         source_master: SourceMaster,
-        social_proof_fetcher: SocialProofFetcher,
+        social_proof_fetcher: MultiSourceSocialProofFetcher,
     ) -> None:
         """Buzzスコア計算サービスを初期化する.
 
         Args:
             interest_profile: 興味プロファイル
             source_master: 収集元マスタ
-            social_proof_fetcher: SocialProof取得サービス
+            social_proof_fetcher: MultiSourceSocialProof取得サービス（4指標統合）
         """
         self._interest_profile = interest_profile
         self._source_master = source_master
@@ -65,9 +65,8 @@ class BuzzScorer:
         # 前処理: URL出現回数を集計
         url_counts: dict[str, int] = Counter(article.normalized_url for article in articles)
 
-        # SocialProof（はてブ数）を一括取得
-        urls = [article.url for article in articles]
-        social_proof_counts = await self._social_proof_fetcher.fetch_batch(urls)
+        # SocialProof（4指標統合スコア）を一括取得
+        social_proof_scores = await self._social_proof_fetcher.fetch_batch(articles)
 
         # 各記事のスコアを計算
         scores: dict[str, BuzzScore] = {}
@@ -75,9 +74,7 @@ class BuzzScorer:
         for article in articles:
             recency_score = self._calculate_recency_score(article)
             consensus_score = self._calculate_consensus_score(article.normalized_url, url_counts)
-            social_proof_score = self._calculate_social_proof_score(
-                article.url, social_proof_counts
-            )
+            social_proof_score = social_proof_scores.get(article.url, 40.0)  # デフォルト40.0
             interest_score = self._calculate_interest_score(article)
             authority_score = self._calculate_authority_score(article.source_name)
 
@@ -97,7 +94,7 @@ class BuzzScorer:
                 interest_score=interest_score,
                 authority_score=authority_score,
                 source_count=url_counts.get(article.normalized_url, 1),
-                social_proof_count=social_proof_counts.get(article.url, 0),
+                social_proof_count=0,  # 4指標統合版では個別カウント不要
                 total_score=total_score,
             )
 
@@ -144,31 +141,8 @@ class BuzzScorer:
         source_count = url_counts.get(normalized_url, 1)
         return min(source_count * 20.0, 100.0)
 
-    def _calculate_social_proof_score(self, url: str, social_proof_counts: dict[str, int]) -> float:
-        """SocialProof（外部反応）スコアを計算する.
-
-        Args:
-            url: 記事URL
-            social_proof_counts: はてブ数の辞書
-
-        Returns:
-            スコア（0-100）
-        """
-        count = social_proof_counts.get(url, 0)
-
-        if count >= 100:
-            return 100.0
-        elif count >= 50:
-            return 70.0
-        elif count >= 10:
-            return 50.0
-        elif count >= 1:
-            return 20.0
-        else:
-            return 0.0
-
     def _calculate_interest_score(self, article: Article) -> float:
-        """Interest（興味との一致度）スコアを計算する.
+        """Interest（興味との一致度）スコアを計算する（5段階版）.
 
         Args:
             article: 記事
@@ -178,23 +152,33 @@ class BuzzScorer:
         """
         text = f"{article.title} {article.description}".lower()
 
+        # max_interestトピックとのマッチング
+        for topic in self._interest_profile.max_interest:
+            if self._match_topic(topic, text):
+                return 100.0
+
         # high_interestトピックとのマッチング
         for topic in self._interest_profile.high_interest:
             if self._match_topic(topic, text):
-                return 100.0
+                return 85.0
 
         # medium_interestトピックとのマッチング
         for topic in self._interest_profile.medium_interest:
             if self._match_topic(topic, text):
-                return 60.0
+                return 70.0
 
-        # low_priorityトピックとのマッチング
-        for topic in self._interest_profile.low_priority:
+        # low_interestトピックとのマッチング
+        for topic in self._interest_profile.low_interest:
             if self._match_topic(topic, text):
-                return 20.0
+                return 50.0
 
-        # いずれにも一致しない場合はデフォルト
-        return 40.0
+        # ignore_interestトピックとのマッチング
+        for topic in self._interest_profile.ignore_interest:
+            if self._match_topic(topic, text):
+                return 0.0
+
+        # いずれにも一致しない場合はデフォルト（低関心相当）
+        return 50.0
 
     def _match_topic(self, topic: str, text: str) -> bool:
         """トピックとテキストのマッチング判定.

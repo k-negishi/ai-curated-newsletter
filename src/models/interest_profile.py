@@ -20,29 +20,39 @@ class JudgmentCriterion:
 
 @dataclass
 class InterestProfile:
-    """関心プロファイル.
+    """関心プロファイル（5段階版）.
 
     Attributes:
         summary: プロファイルの概要
+        max_interest: 最高関心を持つトピックのリスト
         high_interest: 高い関心を持つトピックのリスト
         medium_interest: 中程度の関心を持つトピックのリスト
-        low_priority: 低優先度のトピックのリスト
+        low_interest: 低関心のトピックのリスト
+        ignore_interest: 関心外のトピックのリスト
         criteria: 判定基準の辞書（キー: act_now/think/fyi/ignore）
     """
 
     summary: str
+    max_interest: list[str]
     high_interest: list[str]
     medium_interest: list[str]
-    low_priority: list[str]
+    low_interest: list[str]
+    ignore_interest: list[str]
     criteria: dict[str, JudgmentCriterion]
 
     def format_for_prompt(self) -> str:
-        """プロンプト用に関心プロファイルを整形する.
+        """プロンプト用に関心プロファイルを整形する（5段階対応版）.
 
         Returns:
             プロンプトに埋め込むための文字列
         """
         lines = [self.summary.strip(), ""]
+
+        if self.max_interest:
+            lines.append("**最高関心を持つトピック**:")
+            for topic in self.max_interest:
+                lines.append(f"- {topic}")
+            lines.append("")
 
         if self.high_interest:
             lines.append("**強い関心を持つトピック**:")
@@ -56,9 +66,15 @@ class InterestProfile:
                 lines.append(f"- {topic}")
             lines.append("")
 
-        if self.low_priority:
-            lines.append("**低優先度のトピック**:")
-            for topic in self.low_priority:
+        if self.low_interest:
+            lines.append("**低関心のトピック**:")
+            for topic in self.low_interest:
+                lines.append(f"- {topic}")
+            lines.append("")
+
+        if self.ignore_interest:
+            lines.append("**関心外のトピック**:")
+            for topic in self.ignore_interest:
                 lines.append(f"- {topic}")
             lines.append("")
 

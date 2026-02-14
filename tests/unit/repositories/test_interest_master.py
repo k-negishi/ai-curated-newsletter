@@ -11,13 +11,15 @@ from src.models.interest_profile import InterestProfile
 
 @pytest.fixture
 def temp_interests_yaml():
-    """一時的なinterests.yamlファイルを作成するフィクスチャ."""
+    """一時的なinterests.yamlファイルを作成するフィクスチャ（5段階版）."""
     yaml_content = {
         "profile": {
             "summary": "テストサマリ",
+            "max_interest": ["AI Coding"],
             "high_interest": ["AI/ML", "クラウド"],
             "medium_interest": ["データベース"],
-            "low_priority": ["チュートリアル"],
+            "low_interest": ["チュートリアル"],
+            "ignore_interest": ["Ruby"],
         },
         "criteria": {
             "act_now": {
@@ -40,7 +42,7 @@ def temp_interests_yaml():
 
 
 def test_get_profile_success(temp_interests_yaml: str) -> None:
-    """正常にInterestProfileが取得できることを確認."""
+    """正常にInterestProfileが取得できることを確認（5段階版）."""
     # Arrange
     master = InterestMaster(temp_interests_yaml)
 
@@ -50,9 +52,11 @@ def test_get_profile_success(temp_interests_yaml: str) -> None:
     # Assert
     assert isinstance(profile, InterestProfile)
     assert profile.summary == "テストサマリ"
+    assert profile.max_interest == ["AI Coding"]
     assert profile.high_interest == ["AI/ML", "クラウド"]
     assert profile.medium_interest == ["データベース"]
-    assert profile.low_priority == ["チュートリアル"]
+    assert profile.low_interest == ["チュートリアル"]
+    assert profile.ignore_interest == ["Ruby"]
     assert "act_now" in profile.criteria
     assert profile.criteria["act_now"].label == "ACT_NOW"
     assert profile.criteria["act_now"].description == "今すぐ読むべき"
@@ -137,9 +141,11 @@ def test_get_profile_missing_criteria_key() -> None:
     yaml_content = {
         "profile": {
             "summary": "テスト",
+            "max_interest": [],
             "high_interest": [],
             "medium_interest": [],
-            "low_priority": [],
+            "low_interest": [],
+            "ignore_interest": [],
         }
     }
 

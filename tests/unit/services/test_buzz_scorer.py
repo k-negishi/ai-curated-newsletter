@@ -10,7 +10,7 @@ from src.models.interest_profile import InterestProfile, JudgmentCriterion
 from src.models.source_config import AuthorityLevel, FeedType, Priority, SourceConfig
 from src.repositories.source_master import SourceMaster
 from src.services.buzz_scorer import BuzzScorer
-from src.services.social_proof_fetcher import SocialProofFetcher
+from src.services.multi_source_social_proof_fetcher import MultiSourceSocialProofFetcher
 
 
 class TestBuzzScorer:
@@ -18,12 +18,14 @@ class TestBuzzScorer:
 
     @pytest.fixture
     def interest_profile(self) -> InterestProfile:
-        """テスト用InterestProfileを返す."""
+        """テスト用InterestProfileを返す（5段階版）."""
         return InterestProfile(
             summary="テスト用プロファイル",
+            max_interest=["Claude Code", "AI Coding"],
             high_interest=["AI/ML（大規模言語モデル、機械学習基盤）", "Kubernetes"],
             medium_interest=["PostgreSQL", "Terraform"],
-            low_priority=["JavaScript", "React"],
+            low_interest=["JavaScript", "React"],
+            ignore_interest=["Ruby", "PHP"],
             criteria={
                 "act_now": JudgmentCriterion(
                     label="ACT_NOW", description="Test", examples=[]
@@ -75,9 +77,9 @@ class TestBuzzScorer:
         return mock_master
 
     @pytest.fixture
-    def social_proof_fetcher(self) -> SocialProofFetcher:
-        """テスト用SocialProofFetcherを返す（モック）."""
-        mock_fetcher = Mock(spec=SocialProofFetcher)
+    def social_proof_fetcher(self) -> MultiSourceSocialProofFetcher:
+        """テスト用MultiSourceSocialProofFetcherを返す（モック）."""
+        mock_fetcher = Mock(spec=MultiSourceSocialProofFetcher)
         mock_fetcher.fetch_batch = AsyncMock(return_value={})
         return mock_fetcher
 
@@ -86,7 +88,7 @@ class TestBuzzScorer:
         self,
         interest_profile: InterestProfile,
         source_master: SourceMaster,
-        social_proof_fetcher: SocialProofFetcher,
+        social_proof_fetcher: MultiSourceSocialProofFetcher,
     ) -> BuzzScorer:
         """BuzzScorerインスタンスを返す."""
         return BuzzScorer(interest_profile, source_master, social_proof_fetcher)
@@ -173,58 +175,24 @@ class TestBuzzScorer:
         # min(10 * 20, 100) = 100
         assert score == 100.0
 
-    def test_calculate_social_proof_score_zero(self, buzz_scorer: BuzzScorer) -> None:
-        """SocialProofスコア: 0件の場合."""
-        social_proof_counts = {"https://example.com/article": 0}
-
-        score = buzz_scorer._calculate_social_proof_score(
-            "https://example.com/article", social_proof_counts
+    def test_calculate_interest_score_max(self, buzz_scorer: BuzzScorer) -> None:
+        """Interestスコア: max_interest一致時に100点."""
+        article = Article(
+            url="https://example.com/article",
+            title="Claude Codeの新機能",
+            published_at=datetime.now(timezone.utc),
+            source_name="Test",
+            description="AI Codingについての記事",
+            normalized_url="https://example.com/article",
+            collected_at=datetime.now(timezone.utc),
         )
 
-        assert score == 0.0
-
-    def test_calculate_social_proof_score_low(self, buzz_scorer: BuzzScorer) -> None:
-        """SocialProofスコア: 1-9件の場合."""
-        social_proof_counts = {"https://example.com/article": 5}
-
-        score = buzz_scorer._calculate_social_proof_score(
-            "https://example.com/article", social_proof_counts
-        )
-
-        assert score == 20.0
-
-    def test_calculate_social_proof_score_medium(self, buzz_scorer: BuzzScorer) -> None:
-        """SocialProofスコア: 10-49件の場合."""
-        social_proof_counts = {"https://example.com/article": 30}
-
-        score = buzz_scorer._calculate_social_proof_score(
-            "https://example.com/article", social_proof_counts
-        )
-
-        assert score == 50.0
-
-    def test_calculate_social_proof_score_high(self, buzz_scorer: BuzzScorer) -> None:
-        """SocialProofスコア: 50-99件の場合."""
-        social_proof_counts = {"https://example.com/article": 75}
-
-        score = buzz_scorer._calculate_social_proof_score(
-            "https://example.com/article", social_proof_counts
-        )
-
-        assert score == 70.0
-
-    def test_calculate_social_proof_score_max(self, buzz_scorer: BuzzScorer) -> None:
-        """SocialProofスコア: 100件以上の場合."""
-        social_proof_counts = {"https://example.com/article": 150}
-
-        score = buzz_scorer._calculate_social_proof_score(
-            "https://example.com/article", social_proof_counts
-        )
+        score = buzz_scorer._calculate_interest_score(article)
 
         assert score == 100.0
 
     def test_calculate_interest_score_high(self, buzz_scorer: BuzzScorer) -> None:
-        """Interestスコア: high_interest一致時に100点."""
+        """Interestスコア: high_interest一致時に85点."""
         article = Article(
             url="https://example.com/article",
             title="大規模言語モデルの最新動向",
@@ -237,10 +205,10 @@ class TestBuzzScorer:
 
         score = buzz_scorer._calculate_interest_score(article)
 
-        assert score == 100.0
+        assert score == 85.0
 
     def test_calculate_interest_score_medium(self, buzz_scorer: BuzzScorer) -> None:
-        """Interestスコア: medium_interest一致時に60点."""
+        """Interestスコア: medium_interest一致時に70点."""
         article = Article(
             url="https://example.com/article",
             title="PostgreSQLのパフォーマンスチューニング",
@@ -253,10 +221,10 @@ class TestBuzzScorer:
 
         score = buzz_scorer._calculate_interest_score(article)
 
-        assert score == 60.0
+        assert score == 70.0
 
     def test_calculate_interest_score_low(self, buzz_scorer: BuzzScorer) -> None:
-        """Interestスコア: low_priority一致時に20点."""
+        """Interestスコア: low_interest一致時に50点."""
         article = Article(
             url="https://example.com/article",
             title="React 19の新機能",
@@ -269,10 +237,26 @@ class TestBuzzScorer:
 
         score = buzz_scorer._calculate_interest_score(article)
 
-        assert score == 20.0
+        assert score == 50.0
+
+    def test_calculate_interest_score_ignore(self, buzz_scorer: BuzzScorer) -> None:
+        """Interestスコア: ignore_interest一致時に0点."""
+        article = Article(
+            url="https://example.com/article",
+            title="Rubyの新機能",
+            published_at=datetime.now(timezone.utc),
+            source_name="Test",
+            description="Rubyについて",
+            normalized_url="https://example.com/article",
+            collected_at=datetime.now(timezone.utc),
+        )
+
+        score = buzz_scorer._calculate_interest_score(article)
+
+        assert score == 0.0
 
     def test_calculate_interest_score_default(self, buzz_scorer: BuzzScorer) -> None:
-        """Interestスコア: いずれにも一致しない場合は40点."""
+        """Interestスコア: いずれにも一致しない場合は50点（デフォルト）."""
         article = Article(
             url="https://example.com/article",
             title="Unrelated topic",
@@ -285,7 +269,7 @@ class TestBuzzScorer:
 
         score = buzz_scorer._calculate_interest_score(article)
 
-        assert score == 40.0
+        assert score == 50.0
 
     def test_match_topic_main_keyword(self, buzz_scorer: BuzzScorer) -> None:
         """_match_topic: メインキーワードが一致する場合."""
@@ -339,7 +323,7 @@ class TestBuzzScorer:
         assert score == 0.0
 
     def test_calculate_total_score(self, buzz_scorer: BuzzScorer) -> None:
-        """総合スコアが正しく計算されることを確認（5要素）."""
+        """総合スコアが正しく計算されることを確認（5要素、SNS重視版）."""
         recency = 100.0
         consensus = 60.0
         social_proof = 50.0
@@ -350,18 +334,18 @@ class TestBuzzScorer:
             recency, consensus, social_proof, interest, authority
         )
 
-        # (100 * 0.25) + (60 * 0.20) + (50 * 0.20) + (80 * 0.25) + (100 * 0.10)
-        # = 25 + 12 + 10 + 20 + 10 = 77
-        assert total == 77.0
+        # (100 * 0.20) + (60 * 0.15) + (50 * 0.35) + (80 * 0.25) + (100 * 0.05)
+        # = 20 + 9 + 17.5 + 20 + 5 = 71.5
+        assert total == 71.5
 
     @pytest.mark.asyncio
     async def test_calculate_scores(
         self, buzz_scorer: BuzzScorer, sample_article: Article, social_proof_fetcher: Mock
     ) -> None:
-        """全記事のスコアが計算されることを確認（非同期版）."""
-        # SocialProofFetcherのモック設定
+        """全記事のスコアが計算されることを確認（非同期版、4指標統合）."""
+        # MultiSourceSocialProofFetcherのモック設定（4指標統合スコアを返す）
         social_proof_fetcher.fetch_batch.return_value = {
-            "https://example.com/article": 25,
+            "https://example.com/article": 65.0,  # 統合スコア（0-100）
         }
 
         articles = [sample_article]
@@ -374,10 +358,10 @@ class TestBuzzScorer:
         score = scores[sample_article.normalized_url]
         assert score.url == sample_article.url
         assert score.source_count == 1
-        assert score.social_proof_count == 25
+        assert score.social_proof_count == 0  # 4指標統合版では個別カウント不要
+        assert score.social_proof_score == 65.0  # MultiSourceSocialProofFetcherから取得
         assert 0.0 <= score.total_score <= 100.0
         assert 0.0 <= score.recency_score <= 100.0
         assert 0.0 <= score.consensus_score <= 100.0
-        assert 0.0 <= score.social_proof_score <= 100.0
         assert 0.0 <= score.interest_score <= 100.0
         assert 0.0 <= score.authority_score <= 100.0
