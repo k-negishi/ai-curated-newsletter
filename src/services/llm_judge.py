@@ -2,8 +2,11 @@
 
 import asyncio
 import json
+import random
 from dataclasses import dataclass
 from typing import Any
+
+from botocore.exceptions import ClientError
 
 from src.models.article import Article
 from src.models.interest_profile import InterestProfile
@@ -42,6 +45,9 @@ class LlmJudge:
         _inference_profile_arn: インファレンスプロファイルARN (オプション)
         _max_retries: 最大リトライ回数
         _concurrency_limit: 並列度制限
+        _request_interval: 並列リクエスト間隔（秒）
+        _retry_base_delay: リトライの基本遅延時間（秒）
+        _max_backoff: 最大バックオフ時間（秒）
     """
 
     def __init__(
@@ -53,6 +59,9 @@ class LlmJudge:
         inference_profile_arn: str = "",
         max_retries: int = 2,
         concurrency_limit: int = 5,
+        request_interval: float = 0.0,
+        retry_base_delay: float = 2.0,
+        max_backoff: float = 20.0,
     ) -> None:
         """LLM判定サービスを初期化する.
 
@@ -64,6 +73,9 @@ class LlmJudge:
             inference_profile_arn: インファレンスプロファイルARN（デフォルト: ""）
             max_retries: 最大リトライ回数（デフォルト: 2）
             concurrency_limit: 並列度制限（デフォルト: 5）
+            request_interval: 並列リクエスト間隔（秒、デフォルト: 0.0、Phase4で使用）
+            retry_base_delay: リトライの基本遅延時間（秒、デフォルト: 2.0）
+            max_backoff: 最大バックオフ時間（秒、デフォルト: 20.0）
         """
         self._bedrock_client = bedrock_client
         self._cache_repository = cache_repository
@@ -72,6 +84,9 @@ class LlmJudge:
         self._inference_profile_arn = inference_profile_arn
         self._max_retries = max_retries
         self._concurrency_limit = concurrency_limit
+        self._request_interval = request_interval
+        self._retry_base_delay = retry_base_delay
+        self._max_backoff = max_backoff
 
     async def judge_batch(self, articles: list[Article]) -> JudgmentBatchResult:
         """記事リストを一括判定する.
@@ -91,6 +106,8 @@ class LlmJudge:
 
         async def judge_with_semaphore(article: Article) -> JudgmentResult | None:
             async with semaphore:
+                if self._request_interval > 0:
+                    await asyncio.sleep(self._request_interval)
                 return await self._judge_single(article)
 
         # 並列実行
@@ -146,6 +163,9 @@ class LlmJudge:
     async def _judge_single(self, article: Article) -> JudgmentResult:
         """単一記事を判定する（リトライ付き）.
 
+        ThrottlingException や ServiceUnavailableException が発生した場合、
+        最大 max_retries 回までリトライします。
+
         Args:
             article: 判定対象記事
 
@@ -154,7 +174,7 @@ class LlmJudge:
 
         Raises:
             LlmJsonParseError: JSON解析に失敗した場合（リトライ後）
-            LlmTimeoutError: タイムアウトした場合
+            ClientError: Bedrock API エラー（リトライ対象外 or 最大リトライ到達）
         """
         for attempt in range(self._max_retries + 1):
             try:
@@ -193,7 +213,7 @@ class LlmJudge:
                     interest_label=InterestLabel(judgment_data["interest_label"]),
                     buzz_label=BuzzLabel(judgment_data["buzz_label"]),
                     confidence=float(judgment_data["confidence"]),
-                    reason=judgment_data["reason"][:200],  # 最大200文字
+                    summary=judgment_data["summary"][:300],  # 最大300文字
                     model_id=self._model_id,
                     judged_at=now_utc(),
                     published_at=article.published_at,
@@ -227,6 +247,43 @@ class LlmJudge:
                     )
                     raise
 
+            except ClientError as e:
+                # Bedrock API エラー（ThrottlingException, ServiceUnavailableException など）
+                error_code = e.response.get("Error", {}).get("Code", "")
+
+                # リトライ対象のエラーか判定
+                # ThrottlingException: レート制限超過（429相当）
+                # ServiceUnavailableException: サービス利用不可（5xx相当）
+                is_retryable = error_code in ["ThrottlingException", "ServiceUnavailableException"]
+
+                if is_retryable and attempt < self._max_retries:
+                    # 指数バックオフ + ジッター計算
+                    backoff_delay = self._calculate_backoff(
+                        attempt=attempt,
+                        base_delay=self._retry_base_delay,
+                        max_backoff=self._max_backoff,
+                    )
+                    logger.warning(
+                        "llm_judgment_retry_throttling",
+                        url=article.url,
+                        attempt=attempt + 1,
+                        error_code=error_code,
+                        backoff_delay=backoff_delay,
+                        error=str(e),
+                    )
+                    await asyncio.sleep(backoff_delay)
+                    continue
+                else:
+                    # リトライ対象外（ValidationException, AccessDeniedException など）
+                    # または最大リトライ回数に到達
+                    logger.error(
+                        "llm_judgment_client_error",
+                        url=article.url,
+                        error_code=error_code,
+                        error=str(e),
+                    )
+                    raise
+
             except Exception as e:
                 logger.error(
                     "llm_judgment_unexpected_error",
@@ -237,6 +294,22 @@ class LlmJudge:
 
         # ここには到達しないはずだが、型チェックのため
         raise LlmJsonParseError("Max retries exceeded")
+
+    @staticmethod
+    def _calculate_backoff(attempt: int, base_delay: float, max_backoff: float) -> float:
+        """指数バックオフ + ジッターを計算する.
+
+        Args:
+            attempt: リトライ回数（0始まり）
+            base_delay: 基本遅延時間（秒）
+            max_backoff: 最大バックオフ時間（秒）
+
+        Returns:
+            計算されたバックオフ時間（秒）
+        """
+        delay: float = min(base_delay * (2**attempt), max_backoff)
+        jitter: float = random.uniform(0, delay * 0.5)  # 最大50%のジッター
+        return delay + jitter
 
     def _build_prompt(self, article: Article) -> str:
         """判定プロンプトを生成する.
@@ -272,7 +345,7 @@ class LlmJudge:
 - LOW: 低い話題性
 
 **confidence**（信頼度）: 0.0-1.0の範囲で判定の確信度を示す
-**reason**（理由）: 判定理由を簡潔に説明（最大200文字）
+**summary**（要約）: 記事の内容を簡潔に要約（最大300文字、メール表示用）
 **tags**（タグ）: 記事内容を表す技術キーワードを1-3個（例: "Kotlin", "Claude", "AWS"）
 
 # 出力形式
@@ -281,7 +354,7 @@ JSON形式で以下のキーを含めて出力してください:
   "interest_label": "ACT_NOW" | "THINK" | "FYI" | "IGNORE",
   "buzz_label": "HIGH" | "MID" | "LOW",
   "confidence": 0.85,
-  "reason": "判定理由の説明",
+  "summary": "記事の内容を簡潔に要約",
   "tags": ["Kotlin", "Claude"]
 }}
 
@@ -314,7 +387,7 @@ JSON以外は出力しないでください。"""
             data: dict[str, Any] = json.loads(json_text)
 
             # 必須フィールドの検証
-            required_fields = ["interest_label", "buzz_label", "confidence", "reason"]
+            required_fields = ["interest_label", "buzz_label", "confidence", "summary"]
             for field in required_fields:
                 if field not in data:
                     raise LlmJsonParseError(f"Missing required field: {field}")
@@ -343,7 +416,7 @@ JSON以外は出力しないでください。"""
             interest_label=InterestLabel.IGNORE,
             buzz_label=BuzzLabel.LOW,
             confidence=0.0,
-            reason="LLM judgment failed",
+            summary="LLM judgment failed",
             model_id=self._model_id,
             judged_at=now_utc(),
             published_at=article.published_at,

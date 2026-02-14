@@ -20,7 +20,7 @@ def _judgment(
         interest_label=interest_label,
         buzz_label=BuzzLabel.HIGH,
         confidence=0.9,
-        reason="理由",
+        summary="理由",
         model_id="test-model",
         judged_at=datetime(2026, 2, 13, 12, 0, 0, tzinfo=timezone.utc),
         published_at=datetime(2026, 2, 13, 10, 0, 0, tzinfo=timezone.utc),
@@ -265,3 +265,104 @@ def test_format_think_section_subtitle_includes_broader_context() -> None:
 
     # HTML版でもサブタイトルが「技術判断に役立つ記事」であることを確認
     assert "技術判断に役立つ記事" in html
+
+
+def test_format_uses_new_separator_characters() -> None:
+    """区切り線が新しい文字（─）になっていることを検証（Gmail署名誤判定対策）."""
+    formatter = Formatter()
+    body = formatter.format(
+        selected_articles=[
+            _judgment(
+                title="Test Article",
+                url="https://example.com/test",
+                interest_label=InterestLabel.ACT_NOW,
+                tags=["Python"],
+            )
+        ],
+        collected_count=10,
+        judged_count=5,
+        executed_at=datetime(2026, 2, 13, 0, 0, 0, tzinfo=timezone.utc),
+    )
+
+    # 旧区切り線（= や - の繰り返し）が使われていないことを確認
+    assert "=" * 40 not in body
+    assert "-" * 40 not in body
+    # 新区切り線（─）が使われていることを確認
+    assert "─" * 40 in body
+
+
+def test_format_html_uses_new_separator_characters() -> None:
+    """HTML版でも区切り線が新しい文字（─）になっていることを検証."""
+    formatter = Formatter()
+    html = formatter.format_html(
+        selected_articles=[
+            _judgment(
+                title="Test Article",
+                url="https://example.com/test",
+                interest_label=InterestLabel.ACT_NOW,
+                tags=["Python"],
+            )
+        ],
+        collected_count=10,
+        judged_count=5,
+        executed_at=datetime(2026, 2, 13, 0, 0, 0, tzinfo=timezone.utc),
+    )
+
+    # HTML版でも新区切り線（─）が使われていることを確認（<hr/>の代わり）
+    # または <hr/> が残っている場合はそのままでもOK（後で設計判断）
+    # とりあえず旧区切り線がないことを確認
+    assert "=" * 40 not in html
+    assert "-" * 40 not in html
+
+
+def test_format_includes_variable_content_in_footer() -> None:
+    """メール末尾に可変コンテンツ（生成日時）が含まれていることを検証."""
+    formatter = Formatter()
+    executed_at = datetime(2026, 2, 15, 10, 30, 0, tzinfo=timezone.utc)
+    body = formatter.format(
+        selected_articles=[
+            _judgment(
+                title="Test Article",
+                url="https://example.com/test",
+                interest_label=InterestLabel.ACT_NOW,
+                tags=["Python"],
+            )
+        ],
+        collected_count=10,
+        judged_count=5,
+        executed_at=executed_at,
+    )
+
+    # 生成日時がフッターに含まれていることを確認
+    # JST変換: 2026-02-15 10:30:00 UTC -> 2026-02-15 19:30:00 JST
+    assert "生成日時: 2026-02-15 19:30:00" in body
+    # "Generated with Claude Code" の前に生成日時があることを確認
+    generated_pos = body.find("Generated with Claude Code")
+    timestamp_pos = body.find("生成日時: 2026-02-15 19:30:00")
+    assert timestamp_pos < generated_pos
+
+
+def test_format_html_includes_variable_content_in_footer() -> None:
+    """HTML版でもメール末尾に可変コンテンツ（生成日時）が含まれていることを検証."""
+    formatter = Formatter()
+    executed_at = datetime(2026, 2, 15, 10, 30, 0, tzinfo=timezone.utc)
+    html = formatter.format_html(
+        selected_articles=[
+            _judgment(
+                title="Test Article",
+                url="https://example.com/test",
+                interest_label=InterestLabel.ACT_NOW,
+                tags=["Python"],
+            )
+        ],
+        collected_count=10,
+        judged_count=5,
+        executed_at=executed_at,
+    )
+
+    # 生成日時がフッターに含まれていることを確認
+    assert "生成日時: 2026-02-15 19:30:00" in html
+    # "Generated with Claude Code" の前に生成日時があることを確認
+    generated_pos = html.find("Generated with Claude Code")
+    timestamp_pos = html.find("生成日時: 2026-02-15 19:30:00")
+    assert timestamp_pos < generated_pos

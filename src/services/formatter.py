@@ -17,8 +17,9 @@ class Formatter:
     """
 
     _TOKYO_TZ = ZoneInfo("Asia/Tokyo")
-    _SECTION_SEPARATOR = "=" * 40
-    _ITEM_SEPARATOR = "-" * 40
+    # Gmail署名誤判定を避けるため、'=' や '-' の代わりに '─' を使用
+    _SECTION_SEPARATOR = "─" * 40
+    _ITEM_SEPARATOR = "─" * 40
 
     def format(
         self,
@@ -73,6 +74,8 @@ class Formatter:
         )
 
         body_parts.append(self._SECTION_SEPARATOR)
+        body_parts.append(f"生成日時: {jst_executed_at.strftime('%Y-%m-%d %H:%M:%S')}")
+        body_parts.append("")
         body_parts.append("Generated with Claude Code")
         body_parts.append(self._SECTION_SEPARATOR)
 
@@ -128,7 +131,15 @@ class Formatter:
             start_index=article_index,
         )
 
-        html_parts.extend(["<hr/>", "<p>Generated with Claude Code</p>", "</body></html>"])
+        html_parts.extend(
+            [
+                "<hr/>",
+                f"<p>生成日時: {jst_executed_at.strftime('%Y-%m-%d %H:%M:%S')}</p>",
+                "<br/>",
+                "<p>Generated with Claude Code</p>",
+                "</body></html>",
+            ]
+        )
         return "".join(html_parts)
 
     def _append_text_section(
@@ -174,7 +185,7 @@ class Formatter:
         for i, article in enumerate(articles):
             tag_text = self._format_tags(article.tags)
             safe_title = self._escape_non_url_html_text(article.title)
-            safe_description = self._escape_non_url_html_text(article.description)
+            safe_summary = self._escape_non_url_html_text(article.summary)
             safe_tag_text = self._escape_non_url_html_text(tag_text)
             safe_url = html.escape(article.url, quote=True)
 
@@ -188,7 +199,7 @@ class Formatter:
                 f'URL: <a href="{safe_url}" target="_blank" rel="noopener noreferrer">'
                 f"{safe_url}</a><br/>"
                 f"Buzz: {article.buzz_label.value}<br/>"
-                f"概要: {safe_description}"
+                f"概要: {safe_summary}"
             )
 
             # 最後の記事以外は記事間に空白行を追加
@@ -206,7 +217,7 @@ class Formatter:
             f"公開日: {self._format_published_date(article.published_at)}",
             f"URL: {article.url}",
             f"Buzz: {article.buzz_label.value}",
-            f"概要: {article.description}",
+            f"概要: {article.summary}",
             self._ITEM_SEPARATOR,
         ]
         return lines
