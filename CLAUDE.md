@@ -164,12 +164,12 @@ cat .env
 > glossary.mdに新しいドメイン用語を追加
 
 # 機能追加(定型フローはコマンド)
-> /add-feature ユーザープロフィール編集
+> /add-feature ユーザープロフィールを編集  # 日本語、動詞で終わる
 > /add-feature https://github.com/owner/repo/issues/123  # issue URLも指定可能
 
 # 段階的な機能追加(計画と実装を分離)
-> /plan ユーザープロフィール編集  # まず計画だけを立てたい場合
-> /implement .steering/20260214-user-profile-edit/  # 既存の計画から実装
+> /plan ログイン機能を追加  # まず計画だけを立てたい場合
+> /implement .steering/20260214-ログイン機能を追加/  # 既存の計画から実装
 
 # 詳細レビュー(詳細なレポートが必要なとき)
 > /review-docs docs/product-requirements.md

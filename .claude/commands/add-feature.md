@@ -7,7 +7,12 @@ argument-hint: 機能名 または GitHub issue URL
 
 **このコマンドは、`/plan` と `/implement` を順番に実行するラッパーコマンドです。**
 
-**引数:** 機能名 または GitHub issue URL (例: `/add-feature ユーザープロフィール編集` または `/add-feature https://github.com/owner/repo/issues/123`)
+**引数:** 機能名 または GitHub issue URL
+
+**例:**
+- `/add-feature ユーザープロフィールを編集` (日本語、動詞で終わる)
+- `/add-feature ログイン機能を追加`
+- `/add-feature https://github.com/owner/repo/issues/123`
 
 **重要:** このワークフローは、ユーザーの介入なしに、開始から完了まで完全に自動で実行されるように設計されています。各ステップは完了後、ただちに次のステップへ移行してください。
 

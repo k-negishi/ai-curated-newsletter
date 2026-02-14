@@ -7,7 +7,12 @@ argument-hint: 機能名 または GitHub issue URL
 
 **目的:** issue や指示からステアリングファイルを作成し、実装計画を立てる
 
-**引数:** 機能名 または GitHub issue URL (例: `/plan ユーザープロフィール編集` または `/plan https://github.com/owner/repo/issues/123`)
+**引数:** 機能名 または GitHub issue URL
+
+**例:**
+- `/plan ユーザープロフィールを編集` (日本語、動詞で終わる)
+- `/plan ログイン機能を追加`
+- `/plan https://github.com/owner/repo/issues/123`
 
 **出力:** `.steering/[日付]-[機能名]/` ディレクトリと3つのファイル (requirements.md, design.md, tasklist.md)
 
@@ -20,12 +25,17 @@ argument-hint: 機能名 または GitHub issue URL
      - パターン: `https://github.com/{owner}/{repo}/issues/{number}`
      - `gh issue view {number} --json title,body,labels --jq '{title: .title, body: .body, labels: [.labels[].name]}'` で issue 内容を取得
      - タイトルから機能名を生成:
-       - 小文字化
-       - スペースとスラッシュをハイフンに変換
-       - 特殊文字を除去
-       - 例: "ユーザー プロフィール/編集" → "ユーザー-プロフィール-編集"
+       - **日本語の場合**: そのまま保持（小文字化しない）、スペースを削除
+       - **英語の場合**: 小文字化、スペースをハイフンに変換
+       - スラッシュや括弧などの特殊文字を削除
+       - **動詞で終わるように調整** (例: "ユーザープロフィール" → "ユーザープロフィールを編集")
+       - 例:
+         - "ユーザー プロフィール 編集" → "ユーザープロフィール編集"
+         - "/add-feature の分割" → "add-featureを分割"
+         - "Add User Profile" → "add-user-profile"
    - **機能名の場合:**
      - そのまま機能名として使用
+     - **推奨**: 日本語で動詞で終わる形式 (例: "ログイン機能を追加", "パフォーマンスを改善")
 
 2. **現在のタスクコンテキストを確立する:**
    - 機能名: `[引数または issue タイトルから生成した機能名]`
