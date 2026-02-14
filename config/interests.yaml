@@ -20,10 +20,11 @@ profile:
 
   # 中程度の関心を持つトピック（FYI に該当しやすい）
   medium_interest:
-    - REST API設計（設計原則、ベストプラクティス）
+    - API設計（REST、設計原則、ベストプラクティス）
     - バックエンド技術（Kotlin、Ktor、TypeScript）
+    - フロントエンド技術（TypeScript、Vue.js）
     - テスト設計（自動化、品質保証、テスト戦略）
-    - CI改善（CI/CD、デプロイ自動化、開発生産性）
+    - CI改善（CI/CD、デプロイ自動化、開発生産性、GitHub Actions）
     - クラウド技術の最新動向
 
   # 低優先度のトピック（IGNORE に該当しやすい）
