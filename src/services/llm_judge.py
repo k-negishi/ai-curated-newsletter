@@ -39,6 +39,7 @@ class LlmJudge:
         _cache_repository: キャッシュリポジトリ
         _interest_profile: 関心プロファイル
         _model_id: 使用するLLMモデルID
+        _inference_profile_arn: インファレンスプロファイルARN (オプション)
         _max_retries: 最大リトライ回数
         _concurrency_limit: 並列度制限
     """
@@ -49,6 +50,7 @@ class LlmJudge:
         cache_repository: CacheRepository | None,
         interest_profile: InterestProfile,
         model_id: str,
+        inference_profile_arn: str = "",
         max_retries: int = 2,
         concurrency_limit: int = 5,
     ) -> None:
@@ -59,6 +61,7 @@ class LlmJudge:
             cache_repository: キャッシュリポジトリ
             interest_profile: 関心プロファイル
             model_id: 使用するLLMモデルID
+            inference_profile_arn: インファレンスプロファイルARN（デフォルト: ""）
             max_retries: 最大リトライ回数（デフォルト: 2）
             concurrency_limit: 並列度制限（デフォルト: 5）
         """
@@ -66,6 +69,7 @@ class LlmJudge:
         self._cache_repository = cache_repository
         self._interest_profile = interest_profile
         self._model_id = model_id
+        self._inference_profile_arn = inference_profile_arn
         self._max_retries = max_retries
         self._concurrency_limit = concurrency_limit
 
@@ -158,9 +162,13 @@ class LlmJudge:
                 prompt = self._build_prompt(article)
 
                 # Bedrock呼び出し
+                # ARNが設定されていればそれを使用、未設定ならmodel_idを使用
+                model_identifier = (
+                    self._inference_profile_arn if self._inference_profile_arn else self._model_id
+                )
                 response = await asyncio.to_thread(
                     self._bedrock_client.invoke_model,
-                    modelId=self._model_id,
+                    modelId=model_identifier,
                     body=json.dumps(
                         {
                             "anthropic_version": "bedrock-2023-05-31",

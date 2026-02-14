@@ -216,3 +216,45 @@ def test_create_fallback_judgment_includes_published_at(
     assert fallback.published_at == sample_article.published_at
     assert fallback.interest_label.value == "IGNORE"
     assert fallback.buzz_label.value == "LOW"
+
+
+def test_llm_judge_initialization_with_inference_profile_arn(
+    mock_interest_profile: InterestProfile,
+) -> None:
+    """LlmJudgeがinference_profile_arnを正しく保持することを確認."""
+    # Arrange
+    mock_bedrock = MagicMock()
+    test_arn = "arn:aws:bedrock:ap-northeast-1::inference-profile/test-profile"
+
+    # Act
+    llm_judge = LlmJudge(
+        bedrock_client=mock_bedrock,
+        cache_repository=None,
+        interest_profile=mock_interest_profile,
+        model_id="test-model",
+        inference_profile_arn=test_arn,
+    )
+
+    # Assert
+    assert llm_judge._inference_profile_arn == test_arn
+    assert llm_judge._model_id == "test-model"
+
+
+def test_llm_judge_initialization_without_inference_profile_arn(
+    mock_interest_profile: InterestProfile,
+) -> None:
+    """inference_profile_arnが未設定の場合、空文字列がデフォルトとして保持されることを確認."""
+    # Arrange
+    mock_bedrock = MagicMock()
+
+    # Act
+    llm_judge = LlmJudge(
+        bedrock_client=mock_bedrock,
+        cache_repository=None,
+        interest_profile=mock_interest_profile,
+        model_id="test-model",
+    )
+
+    # Assert
+    assert llm_judge._inference_profile_arn == ""
+    assert llm_judge._model_id == "test-model"
