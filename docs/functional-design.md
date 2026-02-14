@@ -67,7 +67,7 @@ graph TB
 
 | 分類 | 技術 | 選定理由 |
 |------|------|----------|
-| 言語 | Python 3.12 | AWS Lambda標準サポート、型ヒント・dataclass対応、豊富なライブラリ |
+| 言語 | Python 3.14 | AWS Lambda標準サポート、型ヒント・dataclass対応、豊富なライブラリ |
 | 実行環境 | AWS Lambda | サーバーレス、低コスト、自動スケール、週2-3回実行に最適 |
 | スケジューラ | AWS EventBridge | cron形式のスケジュール実行、Lambdaとのネイティブ連携 |
 | データストア | DynamoDB | サーバーレス、オンデマンドモード、キャッシュ・履歴保存に最適 |
@@ -287,7 +287,7 @@ class ExecutionSummary:
     deduped_count: int          # 重複排除後件数
     llm_judged_count: int       # LLM判定件数
     cache_hit_count: int        # キャッシュヒット件数
-    final_selected_count: int   # 最終選定件数（0-12）
+    final_selected_count: int   # 最終選定件数（0-15）
     notification_sent: bool     # 通知送信成功フラグ
     execution_time_seconds: float  # 実行時間（秒）
     estimated_cost_usd: float   # 推定コスト（USD）
@@ -770,7 +770,7 @@ class LlmJudge:
 **責務**:
 - Interest Labelによる優先順位付け（ACT_NOW > THINK > FYI > IGNORE）
 - 同一ラベル内でのソート（Buzz Label、鮮度、Confidence）
-- 最大12件の選定
+- 最大15件の選定
 - ドメイン偏り制御（同一ドメイン最大4件）
 
 **インターフェース**:
@@ -780,13 +780,13 @@ from typing import List, Dict
 @dataclass
 class FinalSelectionResult:
     """最終選定結果."""
-    selected_articles: List[Article]  # 選定された記事（最大12件）
+    selected_articles: List[Article]  # 選定された記事（最大15件）
     judgments: Dict[str, JudgmentResult]  # 判定結果辞書
 
 class FinalSelector:
     """最終選定."""
 
-    def __init__(self, max_articles: int = 12, max_per_domain: int = 4) -> None:
+    def __init__(self, max_articles: int = 15, max_per_domain: int = 4) -> None:
         """最終選定器を初期化する.
 
         Args:
@@ -1165,7 +1165,7 @@ sequenceDiagram
     Judge-->>Orch: 判定結果辞書
 
     Orch->>Final: select(articles, judgments)
-    Final-->>Orch: 最終選定 (0-12件)
+    Final-->>Orch: 最終選定 (0-15件)
 
     Orch->>Form: format(selected, judgments, summary)
     Form-->>Orch: メール本文
@@ -1187,7 +1187,7 @@ sequenceDiagram
 6. BuzzScorerが話題性スコアを計算（非LLM）
 7. CandidateSelectorが上位120-150件を選定
 8. LlmJudgeが並列判定（5件ずつ）し、結果をキャッシュ保存
-9. FinalSelectorが最大12件に厳選
+9. FinalSelectorが最大15件に厳選
 10. Formatterがメール本文を生成
 11. Notifierがメール送信
 12. HistoryRepositoryが実行履歴を保存
@@ -1315,7 +1315,7 @@ def calculate_total_buzz_score(
 
 ### 最終選定アルゴリズム
 
-**目的**: LLM判定結果から最大12件を厳選
+**目的**: LLM判定結果から最大15件を厳選
 
 **選定ロジック**:
 
@@ -1337,9 +1337,9 @@ def calculate_total_buzz_score(
 - 同一ドメインは最大4件まで
 - 5件目以降は次のドメインの記事を選定
 
-#### ステップ4: 最大12件選定
-- 上記ルールで上位12件を選定
-- 12件未満の場合はそのまま通知
+#### ステップ4: 最大15件選定
+- 上記ルールで上位15件を選定
+- 15件未満の場合はそのまま通知
 
 **実装例**:
 ```python
@@ -1349,7 +1349,7 @@ from urllib.parse import urlparse
 def select_final_articles(
     articles: List[Article],
     judgments: Dict[str, JudgmentResult],
-    max_articles: int = 12,
+    max_articles: int = 15,
     max_per_domain: int = 4
 ) -> List[Article]:
     """最終的な通知記事を選定する.
@@ -1361,7 +1361,7 @@ def select_final_articles(
         max_per_domain: 同一ドメイン最大数
 
     Returns:
-        選定された記事リスト（最大12件）
+        選定された記事リスト（最大15件）
     """
     # IGNORE以外の記事を抽出
     candidates = [

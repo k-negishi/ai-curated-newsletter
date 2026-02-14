@@ -27,7 +27,7 @@
 
 ## コーディング規約
 
-### Python 3.12 規約
+### Python 3.14 規約
 
 #### 命名規則
 
@@ -37,7 +37,7 @@
 | クラス | PascalCase | `LlmJudge`, `CacheRepository` |
 | 関数・メソッド | snake_case | `normalize_url()`, `calculate_buzz_score()` |
 | 変数 | snake_case | `article_list`, `total_score` |
-| 定数 | UPPER_SNAKE_CASE | `MAX_ARTICLES = 12`, `DEFAULT_TIMEOUT = 10` |
+| 定数 | UPPER_SNAKE_CASE | `MAX_ARTICLES = 15`, `DEFAULT_TIMEOUT = 10` |
 | プライベートメンバ | _leading_underscore | `_internal_method()`, `_cache` |
 
 **理由**:
@@ -558,7 +558,7 @@ uv pip sync requirements.txt
 [project]
 name = "ai-curated-newsletter"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "boto3>=1.34.0",
     "feedparser>=6.0.0",
@@ -588,7 +588,7 @@ dev = [
 
 ```toml
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.14"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
@@ -612,7 +612,7 @@ mypy src/services/llm_judge.py
 
 ```toml
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 100
 
 [tool.ruff.lint]

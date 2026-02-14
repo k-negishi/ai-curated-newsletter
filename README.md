@@ -33,7 +33,7 @@ EventBridge (火・金 09:00 UTC)
   -> Collector -> Normalizer -> Deduplicator -> BuzzScorer
   -> CandidateSelector (max 150)
   -> LlmJudge (Bedrock)
-  -> FinalSelector (max 12, max_per_domain 4)
+  -> FinalSelector (max 15, max_per_domain 4)
   -> Formatter -> Notifier (SES)
 ```
 

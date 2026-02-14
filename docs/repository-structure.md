@@ -200,7 +200,7 @@ class Orchestrator:
 - `buzz_scorer.py`: 話題性スコア計算（非LLM）
 - `candidate_selector.py`: LLM判定候補の選定
 - `llm_judge.py`: LLM判定
-- `final_selector.py`: 最終選定（最大12件）
+- `final_selector.py`: 最終選定（最大15件）
 - `formatter.py`: メール本文生成
 - `notifier.py`: メール送信（SES）
 
@@ -613,7 +613,7 @@ tests/e2e/
 - **関数名**: snake_case
   - 例: `normalize_url()`, `calculate_recency_score()`
 - **定数名**: UPPER_SNAKE_CASE
-  - 例: `MAX_ARTICLES = 12`, `DEFAULT_TIMEOUT = 10`
+  - 例: `MAX_ARTICLES = 15`, `DEFAULT_TIMEOUT = 10`
 
 ### テストファイル名
 

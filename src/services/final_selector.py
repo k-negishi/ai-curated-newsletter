@@ -15,7 +15,7 @@ class FinalSelectionResult:
     """最終選定結果.
 
     Attributes:
-        selected_articles: 最終選定された記事のリスト（最大12件）
+        selected_articles: 最終選定された記事のリスト（最大15件）
     """
 
     selected_articles: list[JudgmentResult]
@@ -32,11 +32,11 @@ class FinalSelector:
         _max_per_domain: 同一ドメインの最大件数
     """
 
-    def __init__(self, max_articles: int = 12, max_per_domain: int = 4) -> None:
+    def __init__(self, max_articles: int = 15, max_per_domain: int = 4) -> None:
         """最終選定サービスを初期化する.
 
         Args:
-            max_articles: 最大選定件数（デフォルト: 12）
+            max_articles: 最大選定件数（デフォルト: 15）
             max_per_domain: 同一ドメインの最大件数（デフォルト: 4）
         """
         self._max_articles = max_articles
@@ -58,7 +58,7 @@ class FinalSelector:
             judgments: LLM判定結果のリスト
 
         Returns:
-            最終選定結果（最大12件）
+            最終選定結果（最大15件）
         """
         logger.info(
             "final_selection_start",

@@ -17,7 +17,7 @@ class ExecutionSummary:
         deduped_count: 重複排除後件数
         llm_judged_count: LLM判定件数
         cache_hit_count: キャッシュヒット件数
-        final_selected_count: 最終選定件数（0-12）
+        final_selected_count: 最終選定件数（0-15）
         notification_sent: 通知送信成功フラグ
         execution_time_seconds: 実行時間（秒）
         estimated_cost_usd: 推定コスト（USD）
