@@ -115,6 +115,10 @@ def test_app_config_dataclass() -> None:
         bedrock_inference_profile_arn="",
         bedrock_region="ap-northeast-1",
         bedrock_max_parallel=5,
+        bedrock_request_interval=2.5,
+        bedrock_retry_base_delay=2.0,
+        bedrock_max_backoff=20.0,
+        bedrock_max_retries=4,
         llm_candidate_max=150,
         final_select_max=15,
         final_select_max_per_domain=4,
@@ -127,6 +131,10 @@ def test_app_config_dataclass() -> None:
     assert config.log_level == "DEBUG"
     assert config.dry_run is False
     assert config.bedrock_inference_profile_arn == ""
+    assert config.bedrock_request_interval == 2.5
+    assert config.bedrock_retry_base_delay == 2.0
+    assert config.bedrock_max_backoff == 20.0
+    assert config.bedrock_max_retries == 4
 
 
 def test_load_config_local_integer_parsing() -> None:
