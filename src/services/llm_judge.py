@@ -188,6 +188,8 @@ class LlmJudge:
                     reason=judgment_data["reason"][:200],  # 最大200文字
                     model_id=self._model_id,
                     judged_at=now_utc(),
+                    published_at=article.published_at,
+                    tags=self._extract_tags(judgment_data),
                 )
 
                 logger.debug(
@@ -263,6 +265,7 @@ class LlmJudge:
 
 **confidence**（信頼度）: 0.0-1.0の範囲で判定の確信度を示す
 **reason**（理由）: 判定理由を簡潔に説明（最大200文字）
+**tags**（タグ）: 記事内容を表す技術キーワードを1-3個（例: "Kotlin", "Claude", "AWS"）
 
 # 出力形式
 JSON形式で以下のキーを含めて出力してください:
@@ -270,7 +273,8 @@ JSON形式で以下のキーを含めて出力してください:
   "interest_label": "ACT_NOW" | "THINK" | "FYI" | "IGNORE",
   "buzz_label": "HIGH" | "MID" | "LOW",
   "confidence": 0.85,
-  "reason": "判定理由の説明"
+  "reason": "判定理由の説明",
+  "tags": ["Kotlin", "Claude"]
 }}
 
 JSON以外は出力しないでください。"""
@@ -307,6 +311,7 @@ JSON以外は出力しないでください。"""
                 if field not in data:
                     raise LlmJsonParseError(f"Missing required field: {field}")
 
+            data["tags"] = self._extract_tags(data)
             return data
 
         except json.JSONDecodeError as e:
@@ -333,4 +338,24 @@ JSON以外は出力しないでください。"""
             reason="LLM judgment failed",
             model_id=self._model_id,
             judged_at=now_utc(),
+            published_at=article.published_at,
+            tags=[],
         )
+
+    def _extract_tags(self, judgment_data: dict[str, Any]) -> list[str]:
+        """LLMレスポンスからタグ配列を取り出して正規化する."""
+        raw_tags = judgment_data.get("tags", [])
+        if not isinstance(raw_tags, list):
+            return []
+
+        normalized: list[str] = []
+        for tag in raw_tags:
+            if not isinstance(tag, str):
+                continue
+            clean_tag = tag.strip()
+            if not clean_tag:
+                continue
+            normalized.append(clean_tag[:30])
+            if len(normalized) >= 5:
+                break
+        return normalized

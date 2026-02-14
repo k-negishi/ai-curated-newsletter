@@ -1,6 +1,6 @@
 """判定結果エンティティモジュール."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
@@ -51,6 +51,8 @@ class JudgmentResult:
         reason: 判定理由（最大200文字）
         model_id: 使用したLLMモデルID
         judged_at: 判定日時（UTC）
+        tags: 記事タグ（例: ["Kotlin", "Claude"]）
+        published_at: 記事の公開日時（UTC）
     """
 
     url: str
@@ -62,3 +64,5 @@ class JudgmentResult:
     reason: str
     model_id: str
     judged_at: datetime
+    published_at: datetime
+    tags: list[str] = field(default_factory=list)

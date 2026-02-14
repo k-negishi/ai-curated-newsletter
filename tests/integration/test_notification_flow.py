@@ -65,3 +65,27 @@ async def test_notification_flow_error_handling(mock_ses_client) -> None:
         notifier.send(subject=subject, body=body)
 
     assert "SES API error" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_notification_flow_with_html_body(mock_ses_client) -> None:
+    """HTML本文が指定された場合、SESペイロードにHtmlパートが含まれることを確認."""
+    notifier = Notifier(
+        ses_client=mock_ses_client,
+        from_email="sender@example.com",
+        to_email="recipient@example.com",
+    )
+
+    result = notifier.send(
+        subject="Test Newsletter",
+        body="This is a test newsletter body.",
+        html_body="<html><body><p>This is html.</p></body></html>",
+    )
+
+    assert result.message_id == "test-message-id"
+
+    call_args = mock_ses_client.send_email.call_args[1]
+    assert call_args["Message"]["Body"]["Text"]["Data"] == "This is a test newsletter body."
+    assert call_args["Message"]["Body"]["Html"]["Data"] == (
+        "<html><body><p>This is html.</p></body></html>"
+    )

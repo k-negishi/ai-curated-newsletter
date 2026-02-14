@@ -14,7 +14,7 @@ class TestFinalSelector:
     @pytest.fixture
     def final_selector(self) -> FinalSelector:
         """FinalSelectorインスタンスを返す."""
-        return FinalSelector(max_articles=12, max_per_domain=4)
+        return FinalSelector(max_articles=15, max_per_domain=4)
 
     def create_judgment(
         self,
@@ -36,6 +36,8 @@ class TestFinalSelector:
             reason="Test reason",
             model_id="test-model",
             judged_at=datetime.now(timezone.utc),
+            published_at=datetime(2026, 2, 13, 12, 0, 0, tzinfo=timezone.utc),
+            tags=[],
         )
 
     def test_filters_ignore_label(self, final_selector: FinalSelector) -> None:
@@ -71,18 +73,18 @@ class TestFinalSelector:
 
     def test_respects_max_articles(self, final_selector: FinalSelector) -> None:
         """最大件数が守られることを確認."""
-        # 異なるドメインから15件の記事を生成（ドメイン偏り制御を回避）
+        # 異なるドメインから20件の記事を生成（ドメイン偏り制御を回避）
         judgments = [
             self.create_judgment(
                 f"https://example{i}.com/article", InterestLabel.ACT_NOW, BuzzLabel.HIGH
             )
-            for i in range(15)
+            for i in range(20)
         ]
 
         result = final_selector.select(judgments)
 
-        # 最大12件に制限される
-        assert len(result.selected_articles) == 12
+        # 最大15件に制限される
+        assert len(result.selected_articles) == 15
 
     def test_respects_max_per_domain(self, final_selector: FinalSelector) -> None:
         """同一ドメインの最大件数が守られることを確認."""
@@ -134,3 +136,17 @@ class TestFinalSelector:
         """空の入力を処理できることを確認."""
         result = final_selector.select([])
         assert len(result.selected_articles) == 0
+
+    def test_default_max_articles_is_15(self) -> None:
+        """デフォルト最大件数が15件であることを確認."""
+        selector = FinalSelector()
+        judgments = [
+            self.create_judgment(
+                f"https://default{i}.com/article", InterestLabel.ACT_NOW, BuzzLabel.HIGH
+            )
+            for i in range(20)
+        ]
+
+        result = selector.select(judgments)
+
+        assert len(result.selected_articles) == 15

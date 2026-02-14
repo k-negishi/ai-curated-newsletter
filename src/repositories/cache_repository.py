@@ -88,6 +88,8 @@ class CacheRepository:
                 reason=item["reason"],
                 model_id=item["model_id"],
                 judged_at=datetime.fromisoformat(item["judged_at"]),
+                published_at=datetime.fromisoformat(item["published_at"]),
+                tags=item.get("tags", []),  # 欠損値の場合は空配列
             )
 
         except ClientError as e:
@@ -118,6 +120,8 @@ class CacheRepository:
                     "reason": judgment.reason,
                     "model_id": judgment.model_id,
                     "judged_at": judgment.judged_at.isoformat(),
+                    "published_at": judgment.published_at.isoformat(),
+                    "tags": judgment.tags,
                 }
             )
             logger.debug("cache_put_success", url=judgment.url)

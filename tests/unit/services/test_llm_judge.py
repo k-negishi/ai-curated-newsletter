@@ -149,3 +149,70 @@ def test_llm_judge_initialization_with_interest_profile(
     assert llm_judge._model_id == "test-model"
     assert llm_judge._max_retries == 3
     assert llm_judge._concurrency_limit == 10
+
+
+def test_parse_response_includes_tags_when_present(
+    mock_interest_profile: InterestProfile, sample_article: Article
+) -> None:
+    """レスポンスにtagsがある場合、配列として取り出せることを確認."""
+    llm_judge = LlmJudge(
+        bedrock_client=MagicMock(),
+        cache_repository=None,
+        interest_profile=mock_interest_profile,
+        model_id="test-model",
+    )
+
+    response = (
+        '{'
+        '"interest_label":"ACT_NOW",'
+        '"buzz_label":"HIGH",'
+        '"confidence":0.9,'
+        '"reason":"important",'
+        '"tags":["Kotlin","Claude"]'
+        '}'
+    )
+    parsed = llm_judge._parse_response(response)
+
+    assert parsed["tags"] == ["Kotlin", "Claude"]
+
+
+def test_parse_response_uses_empty_tags_when_missing(
+    mock_interest_profile: InterestProfile, sample_article: Article
+) -> None:
+    """レスポンスにtagsがない場合、空配列になることを確認."""
+    llm_judge = LlmJudge(
+        bedrock_client=MagicMock(),
+        cache_repository=None,
+        interest_profile=mock_interest_profile,
+        model_id="test-model",
+    )
+
+    response = (
+        '{'
+        '"interest_label":"THINK",'
+        '"buzz_label":"MID",'
+        '"confidence":0.8,'
+        '"reason":"useful"'
+        '}'
+    )
+    parsed = llm_judge._parse_response(response)
+
+    assert parsed["tags"] == []
+
+
+def test_create_fallback_judgment_includes_published_at(
+    mock_interest_profile: InterestProfile, sample_article: Article
+) -> None:
+    """フォールバック判定結果にpublished_atが含まれることを確認."""
+    llm_judge = LlmJudge(
+        bedrock_client=MagicMock(),
+        cache_repository=None,
+        interest_profile=mock_interest_profile,
+        model_id="test-model",
+    )
+
+    fallback = llm_judge._create_fallback_judgment(sample_article)
+
+    assert fallback.published_at == sample_article.published_at
+    assert fallback.interest_label.value == "IGNORE"
+    assert fallback.buzz_label.value == "LOW"
