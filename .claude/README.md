@@ -207,10 +207,12 @@ cd ~/path/to/your-project
 make claude-update
 ```
 
-## ライセンス
+## 謝辞（参考元ライセンス情報）
 
-MIT License
+以下のリポジトリのアイデア・構成・実装方針を参考にしています。
 
-## 貢献
+- https://github.com/GenerativeAgents/claude-code-book-chapter8
+- https://github.com/Jeffallan/claude-skills
 
-改善提案やバグ報告は Issue または Pull Request でお願いします。
+上記リポジトリはいずれも MIT License で公開されています。  
+# テスト変更
