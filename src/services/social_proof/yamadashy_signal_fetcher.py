@@ -85,7 +85,7 @@ class YamadashySignalFetcher:
         return signals
 
     async def _fetch_rss_urls(self) -> list[str]:
-        """yamadashy RSSを取得し、URLリストを返す.
+        """Yamadashy RSSを取得し、URLリストを返す.
 
         Returns:
             RSS内のURLリスト

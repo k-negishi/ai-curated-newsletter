@@ -69,6 +69,4 @@ def normalize_url(url: str) -> str:
     fragment = ""
 
     # 正規化されたURLを構築
-    normalized = urlunparse((scheme, parsed.netloc, path, parsed.params, query, fragment))
-
-    return normalized
+    return urlunparse((scheme, parsed.netloc, path, parsed.params, query, fragment))

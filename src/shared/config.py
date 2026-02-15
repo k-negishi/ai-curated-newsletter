@@ -84,8 +84,7 @@ def load_config() -> AppConfig:
 
     if environment == "local":
         return _load_config_local()
-    else:
-        return _load_config_from_ssm()
+    return _load_config_from_ssm()
 
 
 def _load_config_local() -> AppConfig:

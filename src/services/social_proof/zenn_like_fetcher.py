@@ -170,8 +170,7 @@ class ZennLikeFetcher:
         """
         if page == 1:
             return f"{self.ZENN_API_BASE_URL}?order=weekly"
-        else:
-            return f"{self.ZENN_API_BASE_URL}?order=weekly&page={page}"
+        return f"{self.ZENN_API_BASE_URL}?order=weekly&page={page}"
 
     def _add_articles_to_ranking(
         self, ranking_map: dict[str, int], articles: list[dict[str, str]], start_rank: int
@@ -209,11 +208,10 @@ class ZennLikeFetcher:
         """
         if 1 <= rank <= 10:
             return 100.0
-        elif 11 <= rank <= 30:
+        if 11 <= rank <= 30:
             return 80.0
-        elif 31 <= rank <= 50:
+        if 31 <= rank <= 50:
             return 60.0
-        elif 51 <= rank <= 100:
+        if 51 <= rank <= 100:
             return 40.0
-        else:
-            return 0.0
+        return 0.0

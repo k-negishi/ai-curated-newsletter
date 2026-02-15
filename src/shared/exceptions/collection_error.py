@@ -7,8 +7,6 @@ class CollectionError(Exception):
     全ての収集元からの記事取得に失敗した場合に発生する.
     """
 
-    pass
-
 
 class SourceCollectionError(CollectionError):
     """単一ソース収集エラー.
@@ -16,5 +14,3 @@ class SourceCollectionError(CollectionError):
     特定の収集元からの記事取得に失敗した場合に発生する.
     このエラーは個別にハンドリングされ、他のソースの収集は継続される.
     """
-
-    pass

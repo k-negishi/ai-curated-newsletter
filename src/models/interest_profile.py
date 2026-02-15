@@ -48,35 +48,21 @@ class InterestProfile:
         """
         lines = [self.summary.strip(), ""]
 
-        if self.max_interest:
-            lines.append("**最高関心を持つトピック**:")
-            for topic in self.max_interest:
-                lines.append(f"- {topic}")
-            lines.append("")
+        # トピックレベルとラベルのマッピング
+        topic_sections = [
+            (self.max_interest, "**最高関心を持つトピック**:"),
+            (self.high_interest, "**強い関心を持つトピック**:"),
+            (self.medium_interest, "**中程度の関心を持つトピック**:"),
+            (self.low_interest, "**低関心のトピック**:"),
+            (self.ignore_interest, "**関心外のトピック**:"),
+        ]
 
-        if self.high_interest:
-            lines.append("**強い関心を持つトピック**:")
-            for topic in self.high_interest:
-                lines.append(f"- {topic}")
-            lines.append("")
-
-        if self.medium_interest:
-            lines.append("**中程度の関心を持つトピック**:")
-            for topic in self.medium_interest:
-                lines.append(f"- {topic}")
-            lines.append("")
-
-        if self.low_interest:
-            lines.append("**低関心のトピック**:")
-            for topic in self.low_interest:
-                lines.append(f"- {topic}")
-            lines.append("")
-
-        if self.ignore_interest:
-            lines.append("**関心外のトピック**:")
-            for topic in self.ignore_interest:
-                lines.append(f"- {topic}")
-            lines.append("")
+        for topics, label in topic_sections:
+            if topics:
+                lines.append(label)
+                for topic in topics:
+                    lines.append(f"- {topic}")
+                lines.append("")
 
         return "\n".join(lines).strip()
 

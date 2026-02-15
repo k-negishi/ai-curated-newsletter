@@ -208,11 +208,10 @@ class Collector:
         # published または updated を試行
         if hasattr(entry, "published_parsed") and entry.published_parsed:
             return struct_time_to_datetime(entry.published_parsed)
-        elif hasattr(entry, "updated_parsed") and entry.updated_parsed:
+        if hasattr(entry, "updated_parsed") and entry.updated_parsed:
             return struct_time_to_datetime(entry.updated_parsed)
-        else:
-            # 日時情報がない場合は現在時刻を使用
-            return now_utc()
+        # 日時情報がない場合は現在時刻を使用
+        return now_utc()
 
     def _extract_description(self, entry: feedparser.FeedParserDict) -> str:
         """フィードエントリから概要を抽出する.
@@ -230,10 +229,9 @@ class Collector:
             description = entry.summary
         elif hasattr(entry, "description") and entry.description:
             description = entry.description
-        elif hasattr(entry, "content") and entry.content:
+        elif hasattr(entry, "content") and entry.content and len(entry.content) > 0:
             # content は通常リストなので最初の要素を取得
-            if len(entry.content) > 0:
-                description = entry.content[0].get("value", "")
+            description = entry.content[0].get("value", "")
 
         # HTML タグを除去（簡易版）
         import re

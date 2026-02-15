@@ -209,13 +209,12 @@ class Orchestrator:
                 )
 
                 if dry_run:
-                    logger.info("dry_run_mode", message="Showing formatted output")
-                    # dry_runモードでもフォーマット結果を表示
-                    print("\n" + "=" * 80)
-                    print("📧 フォーマット結果（dry_runモード、メール送信なし）")
-                    print("=" * 80)
-                    print(mail_body)
-                    print("=" * 80 + "\n")
+                    logger.info(
+                        "dry_run_mode",
+                        message="Newsletter formatted (not sent in dry_run mode)",
+                        mail_body_length=len(mail_body),
+                        selected_count=final_selected_count,
+                    )
                     logger.info("step7_complete", notification_sent=notification_sent)
                 else:
                     # メール送信

@@ -211,7 +211,7 @@ class Formatter:
         return index
 
     def _format_article(self, index: int, article: JudgmentResult) -> list[str]:
-        lines = [
+        return [
             f"[{index}] {article.title}",
             f"Tag: {self._format_tags(article.tags)}",
             f"公開日: {self._format_published_date(article.published_at)}",
@@ -220,7 +220,6 @@ class Formatter:
             f"概要: {article.summary}",
             self._ITEM_SEPARATOR,
         ]
-        return lines
 
     def _to_jst(self, dt: datetime) -> datetime:
         return dt.astimezone(self._TOKYO_TZ)

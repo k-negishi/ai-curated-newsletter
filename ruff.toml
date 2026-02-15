@@ -1,0 +1,117 @@
+# ===================================================================
+# Ruff設定ファイル
+# ===================================================================
+# ruffはRust製の超高速Python linter/formatterです。
+# このファイルでは、コード品質を保つためのルールを段階的に定義しています。
+#
+# 設定ファイルの優先順位:
+# 1. ruff.toml（このファイル）
+# 2. pyproject.tomlの[tool.ruff]セクション
+# ===================================================================
+
+# ===================================================================
+# [基本設定]
+# ===================================================================
+# 1行の最大文字数（formatterもこの値を使用）
+line-length = 100
+
+# ターゲットPythonバージョン（Python 3.14の最新機能を使用）
+target-version = "py314"
+
+# ===================================================================
+# [Lintルール設定]
+# ===================================================================
+[lint]
+# チェックを有効化するルール
+select = [
+    # === フェーズ1: 基本ルール（導入済み） ===
+    "E",   # pycodestyle errors - PEP8エラー（空白、行長等）
+    "W",   # pycodestyle warnings - PEP8警告
+    "F",   # pyflakes - 未使用変数・import、未定義変数の検出
+    "I",   # isort - import文の並び順・グループ化（自動修正可能）
+    "B",   # flake8-bugbear - よくあるバグパターン検出（ミュータブルデフォルト引数等）
+    "C4",  # flake8-comprehensions - 内包表記の最適化（冗長なlist()/dict()呼び出しの改善）
+    "UP",  # pyupgrade - 古い構文のモダン化（py314ターゲットなので最新構文に統一）
+
+    # === フェーズ2: セキュリティと非同期、複雑度管理 ===
+    "S",   # bandit - セキュリティチェック（boto3+httpxで認証情報漏洩・インジェクション検出）
+    "ASYNC",  # flake8-async - asyncアンチパターン（httpx+pytest-asyncio使用中の誤用防止）
+    "C90",  # mccabe - 循環的複雑度（複雑度管理、閾値10推奨）
+    "T20",  # flake8-print - print文検出（structlog使用中にprint混入を防止）
+    "SIM",  # flake8-simplify - コード簡素化（冗長な条件分岐・ループの改善提案）
+
+    # === フェーズ3: テスト品質、コード整理、命名規則 ===
+    "PT",  # flake8-pytest-style - pytestベストプラクティス（pytest使用中のfixture/assertの書き方統一）
+    "RET",  # flake8-return - return文の改善（不要なelse/return Noneの検出）
+    "PIE",  # flake8-pie - 不要コード検出（不要なpass文・不要スプレッド等）
+    "N",   # pep8-naming - 命名規則（クラス名・関数名の命名統一）
+    "PLE",  # pylint errors - pylintエラー検出
+    "PLW",  # pylint warnings - pylint警告検出
+    "PLR0911",  # too-many-return-statements - return文が多すぎる関数の検出
+    "PLR0912",  # too-many-branches - 分岐が多すぎる関数の検出
+    "PLR0913",  # too-many-arguments - 引数が多すぎる関数の検出
+    "PLR2004",  # magic-value-comparison - マジックナンバー使用の検出
+    "RUF",  # Ruff独自ルール - 他ツールにない独自検出
+
+    # === フェーズ4: 型チェック最適化、docstring、logging ===
+    "TCH",  # flake8-type-checking - TYPE_CHECKING最適化（mypy strict+型ヒント多用時に実行時importを削減）
+    "D",    # pydocstyle - docstring形式チェック（チーム合意が必要、Googleスタイル準拠）
+    "LOG",  # flake8-logging - logging誤用検出（structlog主体だが標準logging混入チェック）
+]
+
+# チェックを無効化するルール
+ignore = [
+    # E501: line too long
+    # 理由: ruff formatterが自動的に処理するため、lintチェックは不要
+    "E501",
+
+    # S311: Standard pseudo-random generators are not suitable for cryptographic purposes
+    # 理由: ジッター生成やバックオフ計算で random.uniform を使用しているが、暗号目的ではないため問題なし
+    "S311",
+
+    # RUF001: String contains ambiguous unicode character
+    # RUF002: Docstring contains ambiguous unicode character
+    # RUF003: Comment contains ambiguous unicode character
+    # 理由: 日本語のdocstringとコメント、プロンプトテキストで全角括弧（）を使用している。可読性のため全角括弧を許可
+    "RUF001",
+    "RUF002",
+    "RUF003",
+
+    # PLR0913: Too many arguments in function definition
+    # 理由: DI（依存性注入）パターンでコンストラクタ引数が多くなる設計。リファクタリングよりも明示的な依存関係を優先
+    "PLR0913",
+
+    # PLR2004: Magic value used in comparison
+    # 理由: HTTPステータスコード、スコアリング閾値、ランキング判定等で数値を使用。定数化するとかえって可読性が下がる
+    "PLR2004",
+
+    # D104: Missing docstring in public package
+    # 理由: `__init__.py`は通常空ファイルであり、パッケージのdocstringは不要
+    "D104",
+
+    # TC001 (旧TCH001): Move application import into a type-checking block
+    # TC003 (旧TCH003): Move standard library import into a type-checking block
+    # 理由: TYPE_CHECKING最適化は実行時import削減だが、このプロジェクトでは実行時パフォーマンスよりも可読性を優先
+    "TC001",
+    "TC003",
+]
+
+# 循環的複雑度の閾値設定
+[lint.mccabe]
+# 関数の循環的複雑度の上限（10以下を推奨）
+max-complexity = 10
+
+# docstring形式の設定
+[lint.pydocstyle]
+# Googleスタイルのdocstring規約を使用
+convention = "google"
+
+# ===================================================================
+# [Formatterル設定]
+# ===================================================================
+[format]
+# クォートスタイル（ダブルクォートを使用）
+quote-style = "double"
+
+# インデントスタイル（スペースを使用）
+indent-style = "space"

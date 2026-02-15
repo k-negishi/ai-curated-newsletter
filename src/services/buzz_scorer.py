@@ -154,30 +154,19 @@ class BuzzScorer:
         """
         text = f"{article.title} {article.description}".lower()
 
-        # max_interestトピックとのマッチング
-        for topic in self._interest_profile.max_interest:
-            if self._match_topic(topic, text):
-                return 100.0
+        # トピックレベルとスコアのマッピング
+        topic_levels = [
+            (self._interest_profile.max_interest, 100.0),
+            (self._interest_profile.high_interest, 85.0),
+            (self._interest_profile.medium_interest, 70.0),
+            (self._interest_profile.low_interest, 50.0),
+            (self._interest_profile.ignore_interest, 0.0),
+        ]
 
-        # high_interestトピックとのマッチング
-        for topic in self._interest_profile.high_interest:
-            if self._match_topic(topic, text):
-                return 85.0
-
-        # medium_interestトピックとのマッチング
-        for topic in self._interest_profile.medium_interest:
-            if self._match_topic(topic, text):
-                return 70.0
-
-        # low_interestトピックとのマッチング
-        for topic in self._interest_profile.low_interest:
-            if self._match_topic(topic, text):
-                return 50.0
-
-        # ignore_interestトピックとのマッチング
-        for topic in self._interest_profile.ignore_interest:
-            if self._match_topic(topic, text):
-                return 0.0
+        for topics, score in topic_levels:
+            for topic in topics:
+                if self._match_topic(topic, text):
+                    return score
 
         # いずれにも一致しない場合はデフォルト（低関心相当）
         return 50.0
@@ -229,12 +218,12 @@ class BuzzScorer:
 
         if authority_level == AuthorityLevel.OFFICIAL:
             return 100.0
-        elif authority_level == AuthorityLevel.HIGH:
+        if authority_level == AuthorityLevel.HIGH:
             return 80.0
-        elif authority_level == AuthorityLevel.MEDIUM:
+        if authority_level == AuthorityLevel.MEDIUM:
             return 50.0
-        else:  # LOW or 未設定
-            return 0.0
+        # LOW or 未設定
+        return 0.0
 
     def _calculate_total_score(
         self,

@@ -45,8 +45,9 @@
 # 1. テスト実行
 .venv/bin/pytest tests/ -v
 
-# 2. リントチェック
-.venv/bin/ruff check src/
+# 2. Ruff違反の確認と修正
+.venv/bin/ruff check src/              # エラー確認
+.venv/bin/ruff check src/ --fix        # 自動修正（エラーがある場合）
 
 # 3. コードフォーマット
 .venv/bin/ruff format src/
@@ -60,6 +61,14 @@
 - ruff: `All checks passed!` を確認
 - mypy: `Success: no issues found` を確認
 - pytest: 今回の変更に関連するテストが全てパスすることを確認
+
+**Ruff違反の修正フロー:**
+
+1. **エラー確認**: `ruff check src/` でエラーを確認
+2. **自動修正**: `ruff check src/ --fix` で自動修正
+3. **手動修正**: 残りのエラーを優先度順に修正（セキュリティ > 複雑度 > スタイル）
+4. **再確認**: `All checks passed!` が表示されるまで繰り返す
+5. **テスト再実行**: `.venv/bin/pytest tests/ -v` でテストが壊れていないか確認（重要）
 
 #### ローカル実行（動作確認）
 

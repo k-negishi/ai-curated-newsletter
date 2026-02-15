@@ -65,10 +65,6 @@ uv pip install -e ".[dev]"
 
 `.env.example` をコピーして `.env` を作成し、必要に応じて編集してください。
 
-```bash
-cp .env.example .env
-```
-
 LLM 判定候補件数の運用目安:
 
 - `LLM_CANDIDATE_MAX=120`（推奨）
@@ -120,12 +116,29 @@ sam local invoke NewsletterFunction --event events/production.json
 
 ## テスト・品質チェック
 
+**注**: ruffの設定は `ruff.toml` に記載されています。
+
 ```bash
+# 1. テスト実行
 .venv/bin/pytest tests/ -v
-.venv/bin/ruff check src/
-.venv/bin/ruff format src/
+
+# 2. Ruff違反の確認と修正
+.venv/bin/ruff check src/              # エラー確認
+.venv/bin/ruff check src/ --fix        # 自動修正（エラーがある場合）
+.venv/bin/ruff format src/             # コードフォーマット
+
+# 3. 型チェック
 .venv/bin/mypy src/
 ```
+
+### Ruff違反の修正手順
+
+1. **エラー確認**: `ruff check src/` でエラーを確認
+2. **自動修正**: `ruff check src/ --fix` で自動修正可能なエラーを修正
+3. **手動修正**: 残りのエラーを優先度順に修正（セキュリティ > 複雑度 > スタイル）
+4. **再確認**: `ruff check src/` で `All checks passed!` を確認
+5. **フォーマット**: `ruff format src/` でコードスタイルを統一
+6. **テスト再実行**: `.venv/bin/pytest tests/ -v` でテストが壊れていないか確認
 
 ## デプロイ（AWS SAM）
 

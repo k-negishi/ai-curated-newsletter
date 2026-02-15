@@ -7,8 +7,6 @@ class LlmError(Exception):
     LLMによる記事判定中に発生するエラーの基底クラス.
     """
 
-    pass
-
 
 class LlmJsonParseError(LlmError):
     """LLM出力のJSON解析エラー.
@@ -17,13 +15,9 @@ class LlmJsonParseError(LlmError):
     リトライ対象のエラー（最大2回）.
     """
 
-    pass
-
 
 class LlmTimeoutError(LlmError):
     """LLMタイムアウトエラー.
 
     LLMのレスポンスがタイムアウト時間内に返ってこない場合に発生する.
     """
-
-    pass

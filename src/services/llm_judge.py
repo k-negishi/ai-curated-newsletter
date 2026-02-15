@@ -239,13 +239,12 @@ class LlmJudge:
                     )
                     await asyncio.sleep(1.0 * (attempt + 1))  # 指数バックオフ
                     continue
-                else:
-                    logger.error(
-                        "llm_judgment_json_parse_failed",
-                        url=article.url,
-                        error=str(e),
-                    )
-                    raise
+                logger.error(
+                    "llm_judgment_json_parse_failed",
+                    url=article.url,
+                    error=str(e),
+                )
+                raise
 
             except ClientError as e:
                 # Bedrock API エラー（ThrottlingException, ServiceUnavailableException など）
@@ -273,16 +272,15 @@ class LlmJudge:
                     )
                     await asyncio.sleep(backoff_delay)
                     continue
-                else:
-                    # リトライ対象外（ValidationException, AccessDeniedException など）
-                    # または最大リトライ回数に到達
-                    logger.error(
-                        "llm_judgment_client_error",
-                        url=article.url,
-                        error_code=error_code,
-                        error=str(e),
-                    )
-                    raise
+                # リトライ対象外（ValidationException, AccessDeniedException など）
+                # または最大リトライ回数に到達
+                logger.error(
+                    "llm_judgment_client_error",
+                    url=article.url,
+                    error_code=error_code,
+                    error=str(e),
+                )
+                raise
 
             except Exception as e:
                 logger.error(

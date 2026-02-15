@@ -7,5 +7,3 @@ class NotificationError(Exception):
     メール送信（SES）に失敗した場合に発生する.
     このエラーは致命的で、実行を中断する.
     """
-
-    pass

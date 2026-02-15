@@ -608,31 +608,17 @@ mypy src/services/llm_judge.py
 
 ### ruff（リンター・フォーマッター）
 
-**設定ファイル（pyproject.toml）**:
+**設定ファイル（ruff.toml）**:
 
-```toml
-[tool.ruff]
-target-version = "py314"
-line-length = 100
+ruff設定は `ruff.toml` に独立して管理されています。段階的にルールを導入し、各ルールの目的を日本語コメントで明記しています。
 
-[tool.ruff.lint]
-select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade
-]
-ignore = [
-    "E501",  # line too long (formatter handles this)
-]
+主要なルール:
+- **フェーズ1（基本）**: E, W, F, I, B, C4, UP
+- **フェーズ2（セキュリティ・非同期）**: S, ASYNC, C90, T20, SIM
+- **フェーズ3（テスト品質・命名規則）**: PT, RET, PIE, N, PLE, PLW, PLR0911-0913, PLR2004, RUF
+- **フェーズ4（型チェック・docstring）**: TCH, D, LOG
 
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-```
+詳細は `ruff.toml` を参照してください。
 
 **実行方法**:
 
