@@ -114,6 +114,67 @@ sam local invoke NewsletterFunction --event events/dry_run.json
 sam local invoke NewsletterFunction --event events/production.json
 ```
 
+## Claude Code 共通リポジトリ管理
+
+このプロジェクトでは、Claude Code のコマンド・スキル・エージェントを共通リポジトリ（[claude-python-toolkit](https://github.com/k-negishi/claude-python-toolkit)）で一元管理しています。
+
+### アーキテクチャ
+
+```
+プロジェクト/
+├── .claude-shared/              # git subtreeで共通リポを配置
+│   ├── commands/                # 共通コマンド
+│   ├── skills/                  # 共通スキル
+│   └── agents/                  # 共通エージェント
+├── .claude/                     # Claude Codeが認識するディレクトリ
+│   ├── commands/                # symlink（共通） + 実ファイル（プロジェクト固有）
+│   ├── skills/                  # symlink（共通） + 実ファイル（プロジェクト固有）
+│   ├── agents/                  # symlink（共通） + 実ファイル（プロジェクト固有）
+│   └── settings.json            # プロジェクト固有設定
+└── Makefile                     # Subtree + symlink管理
+```
+
+**ポイント:**
+- `.claude-shared/` には共通リポジトリの実ファイルが配置される（git subtree）
+- `.claude/` には共通リポジトリへの symlink と、プロジェクト固有ファイル（`settings.json`, `local-python-qa/` など）が配置される
+- Git は symlink をサポートしているため、通常の Git 操作でコミット可能
+
+### 運用コマンド
+
+```bash
+# 共通リポジトリの更新を取得
+make claude-update
+
+# symlinkだけ再構築
+make claude-link
+
+# 現状確認
+make claude-status
+
+# 共通symlinkを一時削除（実ファイルは保持）
+make claude-clean
+
+# ローカルの変更を共通リポジトリにプッシュ
+make claude-push
+```
+
+### プロジェクト固有ファイルの管理
+
+通常の Git 操作で管理できます：
+
+```bash
+# プロジェクト固有ファイルを編集
+vim .claude/settings.json
+vim .claude/skills/local-python-qa/SKILL.md
+
+# 通常通りコミット
+git add .claude/settings.json .claude/skills/local-python-qa/
+git commit -m "Update project-specific configs"
+git push
+```
+
+**注意:** symlink は透過的に扱われるため、共通ファイルとプロジェクト固有ファイルを意識する必要はありません。
+
 ## テスト・品質チェック
 
 **注**: ruffの設定は `ruff.toml` に記載されています。
