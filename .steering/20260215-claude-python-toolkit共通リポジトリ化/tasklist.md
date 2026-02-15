@@ -189,22 +189,22 @@
 
 ### 2-2. 既存`.claude`をGitから削除
 
-- [ ] `.claude`をGitから削除（ワーキングツリーには残す）
+- [x] `.claude`をGitから削除（ワーキングツリーには残す）
   ```bash
   git rm -r --cached .claude
   ```
-- [ ] コミット
+- [x] コミット
   ```bash
   git commit -m "Remove .claude directory before Subtree integration"
   ```
 
 ### 2-3. Subtree追加
 
-- [ ] `make claude-init`を実行
+- [x] `make claude-init`を実行
   ```bash
   make claude-init
   ```
-- [ ] Subtree追加が成功したことを確認
+- [x] Subtree追加が成功したことを確認
   ```bash
   make claude-status
   ```
@@ -233,17 +233,22 @@
 
 ### 2-5. Subtree統合をコミット&プッシュ
 
-**注意**: プロジェクト側（ai-curated-newsletter）では`.gitignore`を更新しない。`local-`ファイルも通常通りcommit可能。共通リポジトリ側の`.gitignore`は既にフェーズ1で設定済み。
+**注意**: `.claude/.gitignore`を削除してプロジェクト側で`local-`ファイルをコミット可能にした。
 
-- [ ] git addでファイルを追加
+- [x] `.claude/.gitignore`を削除（根本的解決）
+  ```bash
+  git rm .claude/.gitignore
+  echo ".claude/.gitignore" >> .gitignore
+  ```
+- [x] git addでファイルを追加
   ```bash
   git add .
   ```
-- [ ] git commitでコミット
+- [x] git commitでコミット
   ```bash
   git commit -m "Integrate claude-python-toolkit via Git Subtree"
   ```
-- [ ] git pushでプッシュ
+- [x] git pushでプッシュ
   ```bash
   git push origin main
   ```
