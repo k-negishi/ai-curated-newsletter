@@ -4,3 +4,11 @@
 # Environment variables
 .env
 .env.local
+
+# .claude内のlocal-*ファイルはプロジェクト固有として含める
+!.claude/local-*/
+!.claude/local-*/**
+!.claude/settings.local.json
+
+# Subtreeで持ち込まれる.gitignoreを無視
+.claude/.gitignore
