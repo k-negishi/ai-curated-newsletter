@@ -216,3 +216,4 @@ make claude-update
 
 上記リポジトリはいずれも MIT License で公開されています。  
 # テスト変更
+# プロジェクト側からの変更
