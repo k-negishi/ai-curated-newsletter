@@ -1,1 +1,1 @@
-../../../.claude-shared/commands/review-docs.md
+../../.claude-shared/commands/review-docs.md

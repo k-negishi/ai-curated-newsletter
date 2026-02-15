@@ -1,1 +1,1 @@
-../../../.claude-shared/agents/doc-reviewer.md
+../../.claude-shared/agents/doc-reviewer.md

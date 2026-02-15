@@ -32,7 +32,7 @@ claude-link:
 		base=$$(basename "$$file"); \
 		target="$(CLAUDE_DIR)/commands/$$base"; \
 		if [ ! -e "$$target" ]; then \
-			ln -sf "../../../.claude-shared/commands/$$base" "$$target"; \
+			ln -sf "../../.claude-shared/commands/$$base" "$$target"; \
 			echo "  Link: $$target -> .claude-shared/commands/$$base"; \
 		else \
 			echo "  Skip (exists): $$target"; \
@@ -43,7 +43,7 @@ claude-link:
 		base=$$(basename "$$dir"); \
 		target="$(CLAUDE_DIR)/skills/$$base"; \
 		if [ ! -e "$$target" ]; then \
-			ln -sf "../../../.claude-shared/skills/$$base" "$$target"; \
+			ln -sf "../../.claude-shared/skills/$$base" "$$target"; \
 			echo "  Link: $$target -> .claude-shared/skills/$$base"; \
 		else \
 			echo "  Skip (exists): $$target"; \
@@ -54,7 +54,7 @@ claude-link:
 		base=$$(basename "$$file"); \
 		target="$(CLAUDE_DIR)/agents/$$base"; \
 		if [ ! -e "$$target" ]; then \
-			ln -sf "../../../.claude-shared/agents/$$base" "$$target"; \
+			ln -sf "../../.claude-shared/agents/$$base" "$$target"; \
 			echo "  Link: $$target -> .claude-shared/agents/$$base"; \
 		else \
 			echo "  Skip (exists): $$target"; \

@@ -1,1 +1,1 @@
-../../../.claude-shared/commands/add-feature.md
+../../.claude-shared/commands/add-feature.md

@@ -1,1 +1,1 @@
-../../../.claude-shared/commands/spec-plan.md
+../../.claude-shared/commands/spec-plan.md

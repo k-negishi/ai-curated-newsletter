@@ -1,1 +1,1 @@
-../../../.claude-shared/agents/implementation-validator.md
+../../.claude-shared/agents/implementation-validator.md

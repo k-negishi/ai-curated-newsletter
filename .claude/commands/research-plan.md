@@ -1,1 +1,1 @@
-../../../.claude-shared/commands/research-plan.md
+../../.claude-shared/commands/research-plan.md

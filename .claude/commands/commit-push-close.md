@@ -1,1 +1,1 @@
-../../../.claude-shared/commands/commit-push-close.md
+../../.claude-shared/commands/commit-push-close.md

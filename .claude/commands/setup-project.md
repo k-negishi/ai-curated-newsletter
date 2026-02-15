@@ -1,1 +1,1 @@
-../../../.claude-shared/commands/setup-project.md
+../../.claude-shared/commands/setup-project.md
