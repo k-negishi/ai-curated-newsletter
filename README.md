@@ -2,6 +2,34 @@
 
 技術ニュース/テックブログを収集し、LLM で判定して「読む価値のある記事」を厳選してメール通知する AWS Lambda ベースのシステムです。
 
+## Claude Code による仕様駆動開発(SDD)
+
+このプロジェクトでは、Claude Code による AI駆動の仕様駆動開発（SDD）を採用しています。  
+プロジェクトの要件定義、機能設計、アーキテクチャ設計、リポジトリ構成、開発ガイドラインなどはすべて AI と対話しながらドキュメント化され、コード実装もほぼすべてを AI によって生成しています。  
+
+skills などの .claude ファイルは、自前の共通リポジトリ（https://github.com/k-negishi/claude-python-toolkit ）で管理されたスキルやエージェントを活用しつつ、プロジェクト固有の要件に合わせたカスタマイズも行っています。
+
+### アーキテクチャ
+
+```
+プロジェクト/
+├── .claude-shared/              # git subtreeで共通リポを配置
+│   ├── commands/                # 共通コマンド
+│   ├── skills/                  # 共通スキル
+│   └── agents/                  # 共通エージェント
+├── .claude/                     # Claude Codeが認識するディレクトリ
+│   ├── commands/                # symlink（共通） + 実ファイル（プロジェクト固有）
+│   ├── skills/                  # symlink（共通） + 実ファイル（プロジェクト固有）
+│   ├── agents/                  # symlink（共通） + 実ファイル（プロジェクト固有）
+│   └── settings.json            # プロジェクト固有設定
+└── Makefile                     # Subtree + symlink管理
+```
+
+**ポイント:**
+- `.claude-shared/` には共通リポジトリの実ファイルが配置される（git subtree）
+- `.claude/` には共通リポジトリへの symlink と、プロジェクト固有ファイル（`settings.json`, `local-python-qa/` など）が配置される
+- Git は symlink をサポートしているため、通常の Git 操作でコミット可能
+
 ## 現在の実装ステータス（MVP）
 
 - 収集、正規化、重複排除、Buzz スコアリング、LLM 判定、最終選定、メール通知まで実装済み
@@ -113,31 +141,6 @@ sam build
 sam local invoke NewsletterFunction --event events/dry_run.json
 sam local invoke NewsletterFunction --event events/production.json
 ```
-
-## Claude Code 共通リポジトリ管理
-
-このプロジェクトでは、Claude Code のコマンド・スキル・エージェントを共通リポジトリ（[claude-python-toolkit](https://github.com/k-negishi/claude-python-toolkit)）で一元管理しています。
-
-### アーキテクチャ
-
-```
-プロジェクト/
-├── .claude-shared/              # git subtreeで共通リポを配置
-│   ├── commands/                # 共通コマンド
-│   ├── skills/                  # 共通スキル
-│   └── agents/                  # 共通エージェント
-├── .claude/                     # Claude Codeが認識するディレクトリ
-│   ├── commands/                # symlink（共通） + 実ファイル（プロジェクト固有）
-│   ├── skills/                  # symlink（共通） + 実ファイル（プロジェクト固有）
-│   ├── agents/                  # symlink（共通） + 実ファイル（プロジェクト固有）
-│   └── settings.json            # プロジェクト固有設定
-└── Makefile                     # Subtree + symlink管理
-```
-
-**ポイント:**
-- `.claude-shared/` には共通リポジトリの実ファイルが配置される（git subtree）
-- `.claude/` には共通リポジトリへの symlink と、プロジェクト固有ファイル（`settings.json`, `local-python-qa/` など）が配置される
-- Git は symlink をサポートしているため、通常の Git 操作でコミット可能
 
 ### 運用コマンド
 
