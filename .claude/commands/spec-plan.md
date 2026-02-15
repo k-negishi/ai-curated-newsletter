@@ -1,0 +1,1 @@
+../../../.claude-shared/commands/spec-plan.md

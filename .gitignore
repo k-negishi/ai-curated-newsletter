@@ -10,5 +10,5 @@
 !.claude/local-*/**
 !.claude/settings.local.json
 
-# Subtreeで持ち込まれる.gitignoreを無視
-.claude/.gitignore
+# Claude Code - 共通リポジトリの.gitignoreは除外
+.claude-shared/.gitignore
