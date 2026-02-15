@@ -1,3 +1,9 @@
+---
+name: close-issue
+description: GitHub Issueに実装完了のコメントを追加してクローズするスキル。実装完了後のIssue更新時に使用。
+allowed-tools: Bash, Read
+---
+
 # Close Issue スキル
 
 GitHub Issueに実装完了のコメントを追加してクローズするスキルです。

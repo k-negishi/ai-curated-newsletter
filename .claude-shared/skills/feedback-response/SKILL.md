@@ -1,3 +1,9 @@
+---
+name: feedback-response
+description: 実装中または実装後のユーザーフィードバックに迅速かつ構造的に対応するスキル。微調整依頼時に使用。
+allowed-tools: Read, Write, Edit
+---
+
 # Feedback Response スキル
 
 ## 目的

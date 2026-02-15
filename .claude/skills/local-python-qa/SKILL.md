@@ -1,3 +1,9 @@
+---
+name: local-python-qa
+description: Python実装における品質チェック（pytest, ruff, mypy）を実行し、高品質なコードを保証するスキル。実装前後の品質チェック時に使用。
+allowed-tools: Read
+---
+
 # Python品質チェックスキル (local-python-qa)
 
 **目的**: Python実装における品質チェック（pytest, ruff, mypy）を実行し、高品質なコードを保証する

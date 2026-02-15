@@ -1,4 +1,17 @@
-# Claude Toolkit Manager
+---
+name: skill-manager
+description: Claude Codeのコマンド・スキル・エージェントファイルを作成・更新し、共通リポジトリとプロジェクト固有ファイルを適切に管理するスキル。新しいコマンド/スキル/エージェント作成・更新時に使用。
+allowed-tools: Read, Write, Edit, Bash, AskUserQuestion
+metadata:
+  version: "1.0.0"
+  domain: tooling
+  triggers: スキル作成, コマンド作成, エージェント作成, ファイル管理, 共通リポジトリ, Claude Code設定
+  role: manager
+  scope: setup
+  output-format: file
+---
+
+# Skill Manager
 
 **目的**: Claude Code のコマンド・スキル・エージェントファイルを作成・更新し、共通リポジトリとプロジェクト固有ファイルを適切に管理する
 

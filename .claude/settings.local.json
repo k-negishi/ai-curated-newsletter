@@ -3,7 +3,9 @@
     "allow": [
       "Bash(git add:*)",
       "Bash(git push:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(gh issue comment:*)",
+      "Bash(gh issue view:*)"
     ]
   }
 }
