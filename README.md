@@ -275,4 +275,3 @@ make claude-link
 
 上記リポジトリはいずれも MIT License で公開されています。
 
-# Sync Test - Sun Feb 15 18:13:38 JST 2026
