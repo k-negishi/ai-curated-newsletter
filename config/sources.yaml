@@ -13,11 +13,11 @@ sources:
     name: yamadashy Tech Blog RSS Feed
     feed_url: https://yamadashy.github.io/tech-blog-rss-feed/feeds/rss.xml
     feed_type: rss
-    priority: high
+    priority: low
     timeout_seconds: 15
     retry_count: 3
     enabled: true
-    authority_level: high
+    authority_level: low
 
   - source_id: hatena_bookmark_tech
     name: はてなブックマーク（テクノロジー）
