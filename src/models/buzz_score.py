@@ -1,6 +1,11 @@
 """Buzzスコアエンティティモジュール."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import ClassVar
+
+from src.models.judgment import BuzzLabel
 
 
 @dataclass
@@ -24,6 +29,9 @@ class BuzzScore:
         total_score: 総合Buzzスコア（0-100）
     """
 
+    _HIGH_THRESHOLD: ClassVar[float] = 70.0
+    _MID_THRESHOLD: ClassVar[float] = 40.0
+
     url: str
     # 各要素スコア
     recency_score: float
@@ -36,3 +44,20 @@ class BuzzScore:
     social_proof_count: int
     # 総合スコア
     total_score: float
+
+    def to_buzz_label(self) -> BuzzLabel:
+        """total_scoreからBuzzLabelに変換する.
+
+        閾値:
+        - HIGH: total_score >= 70.0
+        - MID: total_score >= 40.0
+        - LOW: total_score < 40.0
+
+        Returns:
+            BuzzLabel
+        """
+        if self.total_score >= self._HIGH_THRESHOLD:
+            return BuzzLabel.HIGH
+        if self.total_score >= self._MID_THRESHOLD:
+            return BuzzLabel.MID
+        return BuzzLabel.LOW

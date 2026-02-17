@@ -259,6 +259,13 @@ class BuzzScore:
 - 各スコア（`recency_score`, `consensus_score`, `social_proof_score`, `interest_score`, `authority_score`, `total_score`）: 0-100の範囲
 - `social_proof_count`: 0以上
 
+**BuzzLabel変換メソッド**:
+```python
+def to_buzz_label(self) -> BuzzLabel:
+    """total_scoreから閾値でBuzzLabelを導出する."""
+    # HIGH ≥ 70, MID ≥ 40, LOW < 40
+```
+
 ### エンティティ: ExecutionSummary（実行サマリ）
 
 ```python
@@ -696,9 +703,11 @@ class CandidateSelector:
 **責務**:
 - AWS Bedrockへの判定リクエスト
 - 関心プロファイルの適用
-- JSON形式の判定結果取得
+- JSON形式の判定結果取得（interest_label, confidence, summary, tags）
 - リトライ・エラーハンドリング
 - 判定結果のキャッシュ保存
+
+**注意**: buzz_labelはLLMでは判定しない。BuzzScoreから閾値変換で導出する（Orchestratorで設定）。
 
 **インターフェース**:
 ```python
@@ -769,9 +778,9 @@ class LlmJudge:
 
 **責務**:
 - Interest Labelによる優先順位付け（ACT_NOW > THINK > FYI > IGNORE）
-- 同一ラベル内でのソート（Buzz Label、鮮度、Confidence）
+- 同一ラベル内でのソート（BuzzScore total_score連続値、鮮度、Confidence）
 - 最大15件の選定
-- ドメイン偏り制御（同一ドメイン最大4件）
+- ドメイン偏り制御（同一ドメイン最大件数、デフォルト: 制限なし）
 
 **インターフェース**:
 ```python
@@ -1328,7 +1337,7 @@ def calculate_total_buzz_score(
 #### ステップ2: 同一ラベル内でのソート
 ```
 ソート順:
-1. Buzz Label (HIGH > MID > LOW)
+1. BuzzScore total_score（連続値、降順）
 2. 鮮度（published_at降順）
 3. Confidence（降順）
 ```
@@ -1370,14 +1379,13 @@ def select_final_articles(
         if article.url in judgments and judgments[article.url].interest_label != "IGNORE"
     ]
 
-    # Interest Label順、Buzz Label順、鮮度順、Confidence順でソート
+    # Interest Label順、BuzzScore順、鮮度順、Confidence順でソート
     interest_priority = {"ACT_NOW": 4, "THINK": 3, "FYI": 2, "IGNORE": 1}
-    buzz_priority = {"HIGH": 3, "MID": 2, "LOW": 1}
 
     candidates.sort(
         key=lambda x: (
             -interest_priority[x[1].interest_label],
-            -buzz_priority[x[1].buzz_label],
+            -(buzz_scores or {}).get(x[0].url, ZERO_BUZZ_SCORE).total_score,
             -x[0].published_at.timestamp(),
             -x[1].confidence
         )

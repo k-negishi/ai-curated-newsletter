@@ -211,7 +211,7 @@ class LlmJudge:
                     title=article.title,
                     description=article.description,
                     interest_label=InterestLabel(judgment_data["interest_label"]),
-                    buzz_label=BuzzLabel(judgment_data["buzz_label"]),
+                    buzz_label=BuzzLabel.LOW,  # BuzzScoreから後で上書きされる
                     confidence=float(judgment_data["confidence"]),
                     summary=judgment_data["summary"][:300],  # 最大300文字
                     model_id=self._model_id,
@@ -224,7 +224,6 @@ class LlmJudge:
                     "llm_judgment_success",
                     url=article.url,
                     interest_label=judgment.interest_label.value,
-                    buzz_label=judgment.buzz_label.value,
                 )
 
                 return judgment
@@ -322,7 +321,7 @@ class LlmJudge:
         profile_text = self._interest_profile.format_for_prompt()
         criteria_text = self._interest_profile.format_criteria_for_prompt()
 
-        return f"""以下の記事について、関心度と話題性を判定してください。
+        return f"""以下の記事について、関心度を判定してください。
 
 # 関心プロファイル
 {profile_text}
@@ -337,11 +336,6 @@ class LlmJudge:
 **interest_label**（関心度）:
 {criteria_text}
 
-**buzz_label**（話題性）:
-- HIGH: 非常に話題（多くのエンジニアが注目）
-- MID: 中程度の話題
-- LOW: 低い話題性
-
 **confidence**（信頼度）: 0.0-1.0の範囲で判定の確信度を示す
 **summary**（要約）: 記事の内容を簡潔に要約（最大300文字、メール表示用）
 **tags**（タグ）: 記事内容を表す技術キーワードを1-3個（例: "Kotlin", "Claude", "AWS"）
@@ -350,7 +344,6 @@ class LlmJudge:
 JSON形式で以下のキーを含めて出力してください:
 {{
   "interest_label": "ACT_NOW" | "THINK" | "FYI" | "IGNORE",
-  "buzz_label": "HIGH" | "MID" | "LOW",
   "confidence": 0.85,
   "summary": "記事の内容を簡潔に要約",
   "tags": ["Kotlin", "Claude"]
@@ -385,7 +378,7 @@ JSON以外は出力しないでください。"""
             data: dict[str, Any] = json.loads(json_text)
 
             # 必須フィールドの検証
-            required_fields = ["interest_label", "buzz_label", "confidence", "summary"]
+            required_fields = ["interest_label", "confidence", "summary"]
             for field in required_fields:
                 if field not in data:
                     raise LlmJsonParseError(f"Missing required field: {field}")

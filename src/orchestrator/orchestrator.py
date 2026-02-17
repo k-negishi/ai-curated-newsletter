@@ -182,8 +182,15 @@ class Orchestrator:
                 failed_count=judgment_result.failed_count,
             )
 
+            # Step 5.5: BuzzScoreからBuzzLabelを設定
+            for judgment in judgment_result.judgments:
+                buzz_score = buzz_scores.get(judgment.url)
+                if buzz_score is not None:
+                    judgment.buzz_label = buzz_score.to_buzz_label()
+            logger.info("step5_5_complete", message="buzz_labels overwritten from buzz_scores")
+
             # Step 6: 最終選定
-            final_result = self._final_selector.select(judgment_result.judgments)
+            final_result = self._final_selector.select(judgment_result.judgments, buzz_scores)
             final_selected_count = len(final_result.selected_articles)
             logger.info("step6_complete", selected_count=final_selected_count)
 

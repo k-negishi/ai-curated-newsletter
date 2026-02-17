@@ -126,7 +126,7 @@ def test_build_prompt_structure(
     assert "# 記事情報" in prompt
     assert "# 判定基準" in prompt
     assert "**interest_label**（関心度）:" in prompt
-    assert "**buzz_label**（話題性）:" in prompt
+    assert "buzz_label" not in prompt  # プロンプトにbuzz_labelが含まれないことを確認
     assert "# 出力形式" in prompt
     assert "JSON形式で以下のキーを含めて出力してください:" in prompt
 
@@ -169,7 +169,6 @@ def test_parse_response_includes_tags_when_present(
     response = (
         '{'
         '"interest_label":"ACT_NOW",'
-        '"buzz_label":"HIGH",'
         '"confidence":0.9,'
         '"summary":"important",'
         '"tags":["Kotlin","Claude"]'
@@ -194,7 +193,6 @@ def test_parse_response_uses_empty_tags_when_missing(
     response = (
         '{'
         '"interest_label":"THINK",'
-        '"buzz_label":"MID",'
         '"confidence":0.8,'
         '"summary":"useful"'
         '}'
@@ -287,7 +285,7 @@ async def test_judge_single_retries_on_throttling_exception(
         ),
         {
             'body': MagicMock(
-                read=lambda: b'{"content":[{"text":"{\\"interest_label\\":\\"ACT_NOW\\",\\"buzz_label\\":\\"HIGH\\",\\"confidence\\":0.9,\\"summary\\":\\"test\\",\\"tags\\":[]}"}]}'
+                read=lambda: b'{"content":[{"text":"{\\"interest_label\\":\\"ACT_NOW\\",\\"confidence\\":0.9,\\"summary\\":\\"test\\",\\"tags\\":[]}"}]}'
             )
         },
     ]
@@ -358,7 +356,7 @@ async def test_judge_single_retries_on_service_unavailable_exception(
         ),
         {
             'body': MagicMock(
-                read=lambda: b'{"content":[{"text":"{\\"interest_label\\":\\"THINK\\",\\"buzz_label\\":\\"MID\\",\\"confidence\\":0.8,\\"summary\\":\\"test\\",\\"tags\\":[]}"}]}'
+                read=lambda: b'{"content":[{"text":"{\\"interest_label\\":\\"THINK\\",\\"confidence\\":0.8,\\"summary\\":\\"test\\",\\"tags\\":[]}"}]}'
             )
         },
     ]
@@ -550,7 +548,6 @@ async def test_judge_single_uses_custom_backoff_config(
                         "content": [{
                             "text": json.dumps({
                                 "interest_label": "ACT_NOW",
-                                "buzz_label": "HIGH",
                                 "confidence": 0.9,
                                 "summary": "テスト理由",
                                 "tags": ["Test"]
@@ -619,9 +616,8 @@ async def test_judge_batch_applies_request_interval(
                     "content": [{
                         "text": json.dumps({
                             "interest_label": "ACT_NOW",
-                            "buzz_label": "HIGH",
                             "confidence": 0.9,
-                            "reason": "テスト理由",
+                            "summary": "テスト理由",
                             "tags": ["Test"]
                         })
                     }]

@@ -3,6 +3,7 @@
 import pytest
 
 from src.models.buzz_score import BuzzScore
+from src.models.judgment import BuzzLabel
 
 
 class TestBuzzScore:
@@ -101,3 +102,61 @@ class TestBuzzScore:
         assert buzz_score.source_count == 5
         assert buzz_score.social_proof_count == 150
         assert buzz_score.total_score == 100.0
+
+
+class TestToBuzzLabel:
+    """to_buzz_label()メソッドのテスト."""
+
+    def _make_buzz_score(self, total_score: float) -> BuzzScore:
+        """テスト用BuzzScoreを生成するヘルパー."""
+        return BuzzScore(
+            url="https://example.com/article",
+            recency_score=0.0,
+            consensus_score=0.0,
+            social_proof_score=0.0,
+            interest_score=0.0,
+            authority_score=0.0,
+            source_count=1,
+            social_proof_count=0,
+            total_score=total_score,
+        )
+
+    def test_to_buzz_label_high(self):
+        """HIGH: total_score=80 の場合HIGHを返す."""
+        buzz_score = self._make_buzz_score(80)
+        assert buzz_score.to_buzz_label() == BuzzLabel.HIGH
+
+    def test_to_buzz_label_high_boundary(self):
+        """HIGH境界値: total_score=70.0 の場合HIGHを返す."""
+        buzz_score = self._make_buzz_score(70.0)
+        assert buzz_score.to_buzz_label() == BuzzLabel.HIGH
+
+    def test_to_buzz_label_mid(self):
+        """MID: total_score=50 の場合MIDを返す."""
+        buzz_score = self._make_buzz_score(50)
+        assert buzz_score.to_buzz_label() == BuzzLabel.MID
+
+    def test_to_buzz_label_mid_boundary(self):
+        """MID境界値: total_score=40.0 の場合MIDを返す."""
+        buzz_score = self._make_buzz_score(40.0)
+        assert buzz_score.to_buzz_label() == BuzzLabel.MID
+
+    def test_to_buzz_label_low(self):
+        """LOW: total_score=20 の場合LOWを返す."""
+        buzz_score = self._make_buzz_score(20)
+        assert buzz_score.to_buzz_label() == BuzzLabel.LOW
+
+    def test_to_buzz_label_low_boundary(self):
+        """LOW境界値: total_score=39.9 の場合LOWを返す."""
+        buzz_score = self._make_buzz_score(39.9)
+        assert buzz_score.to_buzz_label() == BuzzLabel.LOW
+
+    def test_to_buzz_label_edge_zero(self):
+        """エッジケース: total_score=0 の場合LOWを返す."""
+        buzz_score = self._make_buzz_score(0)
+        assert buzz_score.to_buzz_label() == BuzzLabel.LOW
+
+    def test_to_buzz_label_edge_max(self):
+        """エッジケース: total_score=100 の場合HIGHを返す."""
+        buzz_score = self._make_buzz_score(100)
+        assert buzz_score.to_buzz_label() == BuzzLabel.HIGH

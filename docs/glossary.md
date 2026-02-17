@@ -38,13 +38,14 @@
 **説明**:
 LLMは以下のみを実行：
 - Interest判定（ACT_NOW/THINK/FYI/IGNORE）
-- Buzzラベル化（HIGH/MID/LOW）
-- 通知文生成（最終候補確定後）
+- 要約生成（summary）
+- タグ付け（tags）
 
 LLMが実行しないこと：
 - 件数制御（ロジックで制御）
 - 重複排除（URL一致で処理）
 - Buzz定量（非LLMアルゴリズム）
+- Buzzラベル化（BuzzScoreから閾値変換で導出）
 
 **関連用語**:
 - [Interest Label](#interest-label): LLMが判定する関心度ラベル
@@ -155,19 +156,21 @@ class JudgmentResult:
 
 ### Buzz Label
 
-**定義**: LLMが判定する記事の話題性を示す3段階のラベル
+**定義**: BuzzScoreのtotal_scoreから閾値変換で導出される話題性の3段階ラベル
 
 **取りうる値**:
 
-| ラベル | 意味 | 定義 |
+| ラベル | 意味 | 閾値 |
 |-------|------|------|
-| `HIGH` | 高い話題性 | 業界で広く議論されている、または影響力が大きい |
-| `MID` | 中程度の話題性 | 一部のコミュニティで注目されている |
-| `LOW` | 低い話題性 | ニッチなトピック、または限定的な関心 |
+| `HIGH` | 高い話題性 | total_score ≥ 70 |
+| `MID` | 中程度の話題性 | 40 ≤ total_score < 70 |
+| `LOW` | 低い話題性 | total_score < 40 |
+
+**導出方法**: `BuzzScore.to_buzz_label()` メソッドで変換。LLMでは判定しない。
 
 **関連用語**:
-- [Interest Label](#interest-label): 関心度のラベル
-- [Buzzスコア](#buzzスコア): 非LLMで計算する話題性スコア（Buzz Labelとは別物）
+- [Interest Label](#interest-label): 関心度のラベル（LLMが判定）
+- [Buzzスコア](#buzzスコア): Buzz Labelの導出元となる定量スコア
 
 **使用例**:
 ```python
@@ -344,8 +347,8 @@ enabled: true
 **説明**:
 LLM判定済みの記事を以下の基準で最大15件に絞り込む：
 1. Interest Label優先順位（ACT_NOW > THINK > FYI > IGNORE）
-2. 同一ドメイン偏り制御（最大4件/ドメイン）
-3. Buzzスコアの高い順
+2. BuzzScore total_score（連続値、降順）
+3. 鮮度・Confidence
 
 **選定ルール**:
 - IGNOREは除外
@@ -556,7 +559,7 @@ for entry in feed.entries:
 **公式サイト**: https://aws.amazon.com/bedrock/
 
 **本プロジェクトでの用途**:
-Claude Haiku 4.5によるLLM判定（Interest Label、Buzz Label、理由の生成）。
+Claude Haiku 4.5によるLLM判定（Interest Label、要約、タグの生成）。
 
 **使用モデル**: `anthropic.claude-haiku-4-5-20251001-v1:0`
 
