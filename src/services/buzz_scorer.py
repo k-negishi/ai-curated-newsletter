@@ -154,12 +154,12 @@ class BuzzScorer:
         """
         text = f"{article.title} {article.description}".lower()
 
-        # トピックレベルとスコアのマッピング
+        # トピックレベルとスコアのマッピング（下位厳格型）
         topic_levels = [
             (self._interest_profile.max_interest, 100.0),
-            (self._interest_profile.high_interest, 85.0),
-            (self._interest_profile.medium_interest, 70.0),
-            (self._interest_profile.low_interest, 50.0),
+            (self._interest_profile.high_interest, 80.0),
+            (self._interest_profile.medium_interest, 55.0),
+            (self._interest_profile.low_interest, 30.0),
             (self._interest_profile.ignore_interest, 0.0),
         ]
 
@@ -168,8 +168,8 @@ class BuzzScorer:
                 if self._match_topic(topic, text):
                     return score
 
-        # いずれにも一致しない場合はデフォルト（低関心相当）
-        return 50.0
+        # いずれにも一致しない場合はデフォルト（ignore寄りの低スコア）
+        return 15.0
 
     def _match_topic(self, topic: str, text: str) -> bool:
         """トピックとテキストのマッチング判定.

@@ -194,7 +194,7 @@ class TestBuzzScorer:
         assert score == 100.0
 
     def test_calculate_interest_score_high(self, buzz_scorer: BuzzScorer) -> None:
-        """Interestスコア: high_interest一致時に85点."""
+        """Interestスコア: high_interest一致時に80点."""
         article = Article(
             url="https://example.com/article",
             title="大規模言語モデルの最新動向",
@@ -207,10 +207,10 @@ class TestBuzzScorer:
 
         score = buzz_scorer._calculate_interest_score(article)
 
-        assert score == 85.0
+        assert score == 80.0
 
     def test_calculate_interest_score_medium(self, buzz_scorer: BuzzScorer) -> None:
-        """Interestスコア: medium_interest一致時に70点."""
+        """Interestスコア: medium_interest一致時に55点."""
         article = Article(
             url="https://example.com/article",
             title="PostgreSQLのパフォーマンスチューニング",
@@ -223,10 +223,10 @@ class TestBuzzScorer:
 
         score = buzz_scorer._calculate_interest_score(article)
 
-        assert score == 70.0
+        assert score == 55.0
 
     def test_calculate_interest_score_low(self, buzz_scorer: BuzzScorer) -> None:
-        """Interestスコア: low_interest一致時に50点."""
+        """Interestスコア: low_interest一致時に30点."""
         article = Article(
             url="https://example.com/article",
             title="React 19の新機能",
@@ -239,7 +239,7 @@ class TestBuzzScorer:
 
         score = buzz_scorer._calculate_interest_score(article)
 
-        assert score == 50.0
+        assert score == 30.0
 
     def test_calculate_interest_score_ignore(self, buzz_scorer: BuzzScorer) -> None:
         """Interestスコア: ignore_interest一致時に0点."""
@@ -258,7 +258,7 @@ class TestBuzzScorer:
         assert score == 0.0
 
     def test_calculate_interest_score_default(self, buzz_scorer: BuzzScorer) -> None:
-        """Interestスコア: いずれにも一致しない場合は50点（デフォルト）."""
+        """Interestスコア: いずれにも一致しない場合は15点（デフォルト）."""
         article = Article(
             url="https://example.com/article",
             title="Unrelated topic",
@@ -271,7 +271,7 @@ class TestBuzzScorer:
 
         score = buzz_scorer._calculate_interest_score(article)
 
-        assert score == 50.0
+        assert score == 15.0
 
     def test_match_topic_main_keyword(self, buzz_scorer: BuzzScorer) -> None:
         """_match_topic: メインキーワードが一致する場合."""
