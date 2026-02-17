@@ -4,10 +4,24 @@ from collections import Counter
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
+from src.models.buzz_score import BuzzScore
 from src.models.judgment import InterestLabel, JudgmentResult
 from src.shared.logging.logger import get_logger
 
 logger = get_logger(__name__)
+
+# BuzzScoreが見つからない場合のフォールバック用ゼロスコア
+_ZERO_BUZZ_SCORE = BuzzScore(
+    url="",
+    recency_score=0.0,
+    consensus_score=0.0,
+    social_proof_score=0.0,
+    interest_score=0.0,
+    authority_score=0.0,
+    source_count=0,
+    social_proof_count=0,
+    total_score=0.0,
+)
 
 
 @dataclass
@@ -32,30 +46,35 @@ class FinalSelector:
         _max_per_domain: 同一ドメインの最大件数
     """
 
-    def __init__(self, max_articles: int = 15, max_per_domain: int = 4) -> None:
+    def __init__(self, max_articles: int = 15, max_per_domain: int = 0) -> None:
         """最終選定サービスを初期化する.
 
         Args:
             max_articles: 最大選定件数（デフォルト: 15）
-            max_per_domain: 同一ドメインの最大件数（デフォルト: 4）
+            max_per_domain: 同一ドメインの最大件数（デフォルト: 0=制限なし）
         """
         self._max_articles = max_articles
         self._max_per_domain = max_per_domain
 
-    def select(self, judgments: list[JudgmentResult]) -> FinalSelectionResult:
+    def select(
+        self,
+        judgments: list[JudgmentResult],
+        buzz_scores: dict[str, BuzzScore] | None = None,
+    ) -> FinalSelectionResult:
         """最終選定を行う.
 
         優先順位:
         1. Interest Label: ACT_NOW > THINK > FYI > IGNORE（IGNOREは除外）
-        2. Buzz Label: HIGH > MID > LOW
+        2. Buzz Score: total_score降順（連続値による精密なソート）
         3. 鮮度: judged_at降順
         4. Confidence: 信頼度降順
 
         ドメイン偏り制御:
-        - 同一ドメインは最大4件まで
+        - 同一ドメインは
 
         Args:
             judgments: LLM判定結果のリスト
+            buzz_scores: URL→BuzzScoreのマッピング（Noneの場合は全記事0.0扱い）
 
         Returns:
             最終選定結果（最大15件）
@@ -76,7 +95,7 @@ class FinalSelector:
         )
 
         # ステップ2: 優先順位付けでソート
-        sorted_judgments = self._sort_by_priority(non_ignore_judgments)
+        sorted_judgments = self._sort_by_priority(non_ignore_judgments, buzz_scores)
 
         # ステップ3: ドメイン偏り制御しながら選定
         selected = self._select_with_domain_control(sorted_judgments)
@@ -89,11 +108,16 @@ class FinalSelector:
 
         return FinalSelectionResult(selected_articles=selected)
 
-    def _sort_by_priority(self, judgments: list[JudgmentResult]) -> list[JudgmentResult]:
+    def _sort_by_priority(
+        self,
+        judgments: list[JudgmentResult],
+        buzz_scores: dict[str, BuzzScore] | None = None,
+    ) -> list[JudgmentResult]:
         """優先順位に基づいてソートする.
 
         Args:
             judgments: 判定結果のリスト
+            buzz_scores: URL→BuzzScoreのマッピング
 
         Returns:
             ソート済み判定結果のリスト
@@ -106,20 +130,11 @@ class FinalSelector:
             InterestLabel.IGNORE: 3,  # 既に除外されているはずだが念のため
         }
 
-        # Buzz Labelの優先度マップ
-        from src.models.judgment import BuzzLabel
-
-        buzz_priority = {
-            BuzzLabel.HIGH: 0,
-            BuzzLabel.MID: 1,
-            BuzzLabel.LOW: 2,
-        }
-
         return sorted(
             judgments,
             key=lambda j: (
                 interest_priority.get(j.interest_label, 999),
-                buzz_priority.get(j.buzz_label, 999),
+                -(buzz_scores or {}).get(j.url, _ZERO_BUZZ_SCORE).total_score,
                 -j.judged_at.timestamp(),  # 鮮度降順
                 -j.confidence,  # 信頼度降順
             ),
@@ -147,8 +162,8 @@ class FinalSelector:
             # ドメイン取得
             domain = urlparse(judgment.url).netloc
 
-            # 同一ドメインの件数チェック
-            if domain_counts[domain] >= self._max_per_domain:
+            # 同一ドメインの件数チェック（0 = 制限なし）
+            if self._max_per_domain > 0 and domain_counts[domain] >= self._max_per_domain:
                 logger.debug(
                     "domain_limit_reached",
                     url=judgment.url,
@@ -165,7 +180,6 @@ class FinalSelector:
                 "article_selected",
                 url=judgment.url,
                 interest_label=judgment.interest_label.value,
-                buzz_label=judgment.buzz_label.value,
                 domain=domain,
                 domain_count=domain_counts[domain],
             )
