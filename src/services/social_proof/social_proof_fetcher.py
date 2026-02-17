@@ -117,7 +117,7 @@ class SocialProofFetcher:
                 for url, value in raw_counts.items():
                     try:
                         counts[url] = int(value)
-                    except (TypeError, ValueError):
+                    except (TypeError, ValueError):  # fmt: skip
                         logger.warning(
                             "hatena_batch_count_parse_failed",
                             url=url,

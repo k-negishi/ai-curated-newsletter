@@ -2,6 +2,7 @@
 
 from collections import Counter
 from dataclasses import dataclass
+from typing import ClassVar
 from urllib.parse import urlparse
 
 from src.models.buzz_score import BuzzScore
@@ -14,11 +15,9 @@ logger = get_logger(__name__)
 _ZERO_BUZZ_SCORE = BuzzScore(
     url="",
     recency_score=0.0,
-    consensus_score=0.0,
     social_proof_score=0.0,
     interest_score=0.0,
     authority_score=0.0,
-    source_count=0,
     social_proof_count=0,
     total_score=0.0,
 )
@@ -38,13 +37,27 @@ class FinalSelectionResult:
 class FinalSelector:
     """最終選定サービス.
 
-    Interest Labelによる優先順位付けとドメイン偏り制御を行い、
-    最終的に通知する記事を選定する.
+    Composite Score（InterestLabel + 外部話題性の重み付き混合）と
+    ドメイン偏り制御を行い、最終的に通知する記事を選定する.
+
+    Composite Score = α × LABEL_SCORE[label] + (1-α) × normalized_external_buzz
 
     Attributes:
         _max_articles: 最大選定件数
         _max_per_domain: 同一ドメインの最大件数
     """
+
+    # InterestLabelをスコア化（0-100スケール）
+    LABEL_SCORE: ClassVar[dict[InterestLabel, float]] = {
+        InterestLabel.ACT_NOW: 100.0,
+        InterestLabel.THINK: 60.0,
+        InterestLabel.FYI: 20.0,
+        InterestLabel.IGNORE: 0.0,
+    }
+
+    # 混合比率: InterestLabel 40%, 外部話題性 60%
+    INTEREST_WEIGHT: ClassVar[float] = 0.4
+    BUZZ_WEIGHT: ClassVar[float] = 0.6
 
     def __init__(self, max_articles: int = 15, max_per_domain: int = 0) -> None:
         """最終選定サービスを初期化する.
@@ -63,14 +76,12 @@ class FinalSelector:
     ) -> FinalSelectionResult:
         """最終選定を行う.
 
-        優先順位:
-        1. Interest Label: ACT_NOW > THINK > FYI > IGNORE（IGNOREは除外）
-        2. Buzz Score: total_score降順（連続値による精密なソート）
-        3. 鮮度: judged_at降順
-        4. Confidence: 信頼度降順
+        Composite Scoreで統合的にソートし、ドメイン偏り制御を適用する.
 
-        ドメイン偏り制御:
-        - 同一ドメインは
+        優先順位:
+        1. Composite Score降順（InterestLabel×α + external_buzz×(1-α)）
+        2. 鮮度: judged_at降順
+        3. Confidence: 信頼度降順
 
         Args:
             judgments: LLM判定結果のリスト
@@ -94,7 +105,7 @@ class FinalSelector:
             output_count=len(non_ignore_judgments),
         )
 
-        # ステップ2: 優先順位付けでソート
+        # ステップ2: Composite Scoreでソート
         sorted_judgments = self._sort_by_priority(non_ignore_judgments, buzz_scores)
 
         # ステップ3: ドメイン偏り制御しながら選定
@@ -108,12 +119,29 @@ class FinalSelector:
 
         return FinalSelectionResult(selected_articles=selected)
 
+    def _calculate_composite_score(
+        self, interest_label: InterestLabel, buzz_score: BuzzScore
+    ) -> float:
+        """Composite Scoreを計算する.
+
+        composite = α × LABEL_SCORE[label] + (1-α) × normalized_external_buzz
+
+        Args:
+            interest_label: LLM判定によるInterestLabel
+            buzz_score: BuzzScore（external_buzzプロパティを使用）
+
+        Returns:
+            Composite Score（0-100）
+        """
+        label_score = self.LABEL_SCORE.get(interest_label, 0.0)
+        return self.INTEREST_WEIGHT * label_score + self.BUZZ_WEIGHT * buzz_score.external_buzz
+
     def _sort_by_priority(
         self,
         judgments: list[JudgmentResult],
         buzz_scores: dict[str, BuzzScore] | None = None,
     ) -> list[JudgmentResult]:
-        """優先順位に基づいてソートする.
+        """Composite Scoreに基づいてソートする.
 
         Args:
             judgments: 判定結果のリスト
@@ -122,21 +150,15 @@ class FinalSelector:
         Returns:
             ソート済み判定結果のリスト
         """
-        # Interest Labelの優先度マップ
-        interest_priority = {
-            InterestLabel.ACT_NOW: 0,
-            InterestLabel.THINK: 1,
-            InterestLabel.FYI: 2,
-            InterestLabel.IGNORE: 3,  # 既に除外されているはずだが念のため
-        }
-
         return sorted(
             judgments,
             key=lambda j: (
-                interest_priority.get(j.interest_label, 999),
-                -(buzz_scores or {}).get(j.url, _ZERO_BUZZ_SCORE).total_score,
-                -j.judged_at.timestamp(),  # 鮮度降順
-                -j.confidence,  # 信頼度降順
+                -self._calculate_composite_score(
+                    j.interest_label,
+                    (buzz_scores or {}).get(j.url, _ZERO_BUZZ_SCORE),
+                ),
+                -j.judged_at.timestamp(),
+                -j.confidence,
             ),
         )
 

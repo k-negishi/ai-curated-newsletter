@@ -1,7 +1,5 @@
 """Buzzスコア計算サービスモジュール."""
 
-from collections import Counter
-
 from src.models.article import Article
 from src.models.buzz_score import BuzzScore
 from src.models.interest_profile import InterestProfile
@@ -17,23 +15,21 @@ logger = get_logger(__name__)
 
 
 class BuzzScorer:
-    """Buzzスコア計算サービス（5要素統合版）.
+    """Buzzスコア計算サービス（4要素統合版）.
 
     スコア計算式:
     - recency_score = max(100 - (days_old * 10), 0)
-    - consensus_score = min(source_count * 20, 100)
     - social_proof_score = 4指標統合スコア（yamadashy, Hatena, Zenn, Qiita）（0-100）
     - interest_score = InterestProfileとのマッチング度（0-100）
     - authority_score = authority_levelに応じたスコア（0, 50, 80, 100）
-    - total_score = (recency × 0.20) + (consensus × 0.15) + (social_proof × 0.35)
-                  + (interest × 0.25) + (authority × 0.05)
+    - total_score = (social_proof × 0.45) + (interest × 0.35)
+                  + (recency × 0.15) + (authority × 0.05)
     """
 
     # 重み配分（SNS反応を重視）
-    WEIGHT_RECENCY = 0.20
-    WEIGHT_CONSENSUS = 0.15
-    WEIGHT_SOCIAL_PROOF = 0.35
-    WEIGHT_INTEREST = 0.25
+    WEIGHT_SOCIAL_PROOF = 0.45
+    WEIGHT_INTEREST = 0.35
+    WEIGHT_RECENCY = 0.15
     WEIGHT_AUTHORITY = 0.05
 
     def __init__(
@@ -64,9 +60,6 @@ class BuzzScorer:
         """
         logger.info("buzz_scoring_start", article_count=len(articles))
 
-        # 前処理: URL出現回数を集計
-        url_counts: dict[str, int] = Counter(article.normalized_url for article in articles)
-
         # SocialProof（4指標統合スコア）を一括取得
         social_proof_scores = await self._social_proof_fetcher.fetch_batch(articles)
 
@@ -75,14 +68,12 @@ class BuzzScorer:
 
         for article in articles:
             recency_score = self._calculate_recency_score(article)
-            consensus_score = self._calculate_consensus_score(article.normalized_url, url_counts)
             social_proof_score = social_proof_scores.get(article.url, 20.0)  # デフォルト20.0
             interest_score = self._calculate_interest_score(article)
             authority_score = self._calculate_authority_score(article.source_name)
 
             total_score = self._calculate_total_score(
                 recency_score,
-                consensus_score,
                 social_proof_score,
                 interest_score,
                 authority_score,
@@ -91,11 +82,9 @@ class BuzzScorer:
             buzz_score = BuzzScore(
                 url=article.url,
                 recency_score=recency_score,
-                consensus_score=consensus_score,
                 social_proof_score=social_proof_score,
                 interest_score=interest_score,
                 authority_score=authority_score,
-                source_count=url_counts.get(article.normalized_url, 1),
                 social_proof_count=0,  # 4指標統合版では個別カウント不要
                 total_score=total_score,
             )
@@ -107,7 +96,6 @@ class BuzzScorer:
                 url=article.url,
                 total_score=total_score,
                 recency=recency_score,
-                consensus=consensus_score,
                 social_proof=social_proof_score,
                 interest=interest_score,
                 authority=authority_score,
@@ -129,19 +117,6 @@ class BuzzScorer:
         now = now_utc()
         days_old = (now - article.published_at).days
         return max(100.0 - (days_old * 10.0), 0.0)
-
-    def _calculate_consensus_score(self, normalized_url: str, url_counts: dict[str, int]) -> float:
-        """Consensus（複数ソース出現）スコアを計算する.
-
-        Args:
-            normalized_url: 正規化URL
-            url_counts: URL出現回数の辞書
-
-        Returns:
-            スコア（0-100）
-        """
-        source_count = url_counts.get(normalized_url, 1)
-        return min(source_count * 20.0, 100.0)
 
     def _calculate_interest_score(self, article: Article) -> float:
         """Interest（興味との一致度）スコアを計算する（5段階版）.
@@ -228,7 +203,6 @@ class BuzzScorer:
     def _calculate_total_score(
         self,
         recency: float,
-        consensus: float,
         social_proof: float,
         interest: float,
         authority: float,
@@ -237,7 +211,6 @@ class BuzzScorer:
 
         Args:
             recency: 鮮度スコア
-            consensus: Consensusスコア
             social_proof: SocialProofスコア
             interest: Interestスコア
             authority: Authorityスコア
@@ -246,9 +219,8 @@ class BuzzScorer:
             総合スコア（0-100）
         """
         return (
-            (recency * self.WEIGHT_RECENCY)
-            + (consensus * self.WEIGHT_CONSENSUS)
-            + (social_proof * self.WEIGHT_SOCIAL_PROOF)
+            (social_proof * self.WEIGHT_SOCIAL_PROOF)
             + (interest * self.WEIGHT_INTEREST)
+            + (recency * self.WEIGHT_RECENCY)
             + (authority * self.WEIGHT_AUTHORITY)
         )

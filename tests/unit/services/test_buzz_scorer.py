@@ -1,4 +1,4 @@
-"""BuzzScorerサービスのユニットテスト（5要素統合版）."""
+"""BuzzScorerサービスのユニットテスト（4要素統合版）."""
 
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, Mock
@@ -16,7 +16,7 @@ from src.services.social_proof.multi_source_social_proof_fetcher import (
 
 
 class TestBuzzScorer:
-    """BuzzScorerクラスのテスト（5要素統合版）."""
+    """BuzzScorerクラスのテスト（4要素統合版）."""
 
     @pytest.fixture
     def interest_profile(self) -> InterestProfile:
@@ -158,24 +158,6 @@ class TestBuzzScorer:
 
         # max(100 - (20 * 10), 0) = 0
         assert score == 0.0
-
-    def test_calculate_consensus_score(self, buzz_scorer: BuzzScorer) -> None:
-        """Consensusスコアが正しく計算されることを確認."""
-        url_counts = {"https://example.com/article": 3}
-
-        score = buzz_scorer._calculate_consensus_score("https://example.com/article", url_counts)
-
-        # 3 * 20 = 60
-        assert score == 60.0
-
-    def test_calculate_consensus_score_max(self, buzz_scorer: BuzzScorer) -> None:
-        """Consensusスコアが100を超えないことを確認."""
-        url_counts = {"https://example.com/article": 10}
-
-        score = buzz_scorer._calculate_consensus_score("https://example.com/article", url_counts)
-
-        # min(10 * 20, 100) = 100
-        assert score == 100.0
 
     def test_calculate_interest_score_max(self, buzz_scorer: BuzzScorer) -> None:
         """Interestスコア: max_interest一致時に100点."""
@@ -325,20 +307,19 @@ class TestBuzzScorer:
         assert score == 0.0
 
     def test_calculate_total_score(self, buzz_scorer: BuzzScorer) -> None:
-        """総合スコアが正しく計算されることを確認（5要素、SNS重視版）."""
+        """総合スコアが正しく計算されることを確認（4要素、SNS重視版）."""
         recency = 100.0
-        consensus = 60.0
         social_proof = 50.0
         interest = 80.0
         authority = 100.0
 
         total = buzz_scorer._calculate_total_score(
-            recency, consensus, social_proof, interest, authority
+            recency, social_proof, interest, authority
         )
 
-        # (100 * 0.20) + (60 * 0.15) + (50 * 0.35) + (80 * 0.25) + (100 * 0.05)
-        # = 20 + 9 + 17.5 + 20 + 5 = 71.5
-        assert total == 71.5
+        # (50 * 0.45) + (80 * 0.35) + (100 * 0.15) + (100 * 0.05)
+        # = 22.5 + 28 + 15 + 5 = 70.5
+        assert total == 70.5
 
     @pytest.mark.asyncio
     async def test_calculate_scores(
@@ -359,11 +340,9 @@ class TestBuzzScorer:
 
         score = scores[sample_article.normalized_url]
         assert score.url == sample_article.url
-        assert score.source_count == 1
         assert score.social_proof_count == 0  # 4指標統合版では個別カウント不要
         assert score.social_proof_score == 65.0  # MultiSourceSocialProofFetcherから取得
         assert 0.0 <= score.total_score <= 100.0
         assert 0.0 <= score.recency_score <= 100.0
-        assert 0.0 <= score.consensus_score <= 100.0
         assert 0.0 <= score.interest_score <= 100.0
         assert 0.0 <= score.authority_score <= 100.0

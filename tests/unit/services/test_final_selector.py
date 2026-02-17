@@ -9,16 +9,16 @@ from src.models.judgment import BuzzLabel, InterestLabel, JudgmentResult
 from src.services.final_selector import FinalSelector
 
 
-def _make_buzz_score(url: str, total_score: float) -> BuzzScore:
+def _make_buzz_score(
+    url: str, total_score: float, interest_score: float = 0.0
+) -> BuzzScore:
     """テスト用のBuzzScoreを生成するヘルパー."""
     return BuzzScore(
         url=url,
         recency_score=0.0,
-        consensus_score=0.0,
         social_proof_score=0.0,
-        interest_score=0.0,
+        interest_score=interest_score,
         authority_score=0.0,
-        source_count=0,
         social_proof_count=0,
         total_score=total_score,
     )
@@ -271,3 +271,144 @@ class TestFinalSelector:
         # スコアがある方が優先される
         assert result.selected_articles[0].url == "https://example2.com/has-score"
         assert result.selected_articles[1].url == "https://example1.com/no-score"
+
+    def test_composite_fyi_high_buzz_beats_think_low_buzz(
+        self, final_selector: FinalSelector
+    ) -> None:
+        """FYI+バズ大がTHINK+バズ小を上回ることを確認（Composite Score）.
+
+        FYI: total=65, interest=30 → ext=57.5 → norm=76.7 → composite=0.4×20+0.6×76.7=54.0
+        THINK: total=40, interest=80 → ext=20 → norm=26.7 → composite=0.4×60+0.6×26.7=40.0
+        """
+        judgments = [
+            self.create_judgment(
+                "https://think.com/low-buzz", InterestLabel.THINK, BuzzLabel.LOW
+            ),
+            self.create_judgment(
+                "https://fyi.com/high-buzz", InterestLabel.FYI, BuzzLabel.HIGH
+            ),
+        ]
+
+        buzz_scores = {
+            "https://think.com/low-buzz": _make_buzz_score(
+                "https://think.com/low-buzz", total_score=40.0, interest_score=80.0
+            ),
+            "https://fyi.com/high-buzz": _make_buzz_score(
+                "https://fyi.com/high-buzz", total_score=65.0, interest_score=30.0
+            ),
+        }
+
+        result = final_selector.select(judgments, buzz_scores=buzz_scores)
+
+        # FYI+バズ大(54.0) > THINK+バズ小(40.0)
+        assert result.selected_articles[0].url == "https://fyi.com/high-buzz"
+        assert result.selected_articles[1].url == "https://think.com/low-buzz"
+
+    def test_composite_act_now_low_buzz_ranks_middle(
+        self, final_selector: FinalSelector
+    ) -> None:
+        """ACT_NOW+バズ小がTHINK+バズ大より下になることを確認（Composite Score）.
+
+        THINK+high: total=75, interest=55 → ext=61.25 → norm=81.7 → composite=73.0
+        ACT_NOW+low: total=49, interest=100 → ext=24 → norm=32.0 → composite=59.2
+        FYI+low: total=40, interest=80 → ext=20 → norm=26.7 → composite=24.0
+        """
+        judgments = [
+            self.create_judgment(
+                "https://fyi.com/low", InterestLabel.FYI, BuzzLabel.LOW
+            ),
+            self.create_judgment(
+                "https://act-now.com/low", InterestLabel.ACT_NOW, BuzzLabel.LOW
+            ),
+            self.create_judgment(
+                "https://think.com/high", InterestLabel.THINK, BuzzLabel.HIGH
+            ),
+        ]
+
+        buzz_scores = {
+            "https://think.com/high": _make_buzz_score(
+                "https://think.com/high", total_score=75.0, interest_score=55.0
+            ),
+            "https://act-now.com/low": _make_buzz_score(
+                "https://act-now.com/low", total_score=49.0, interest_score=100.0
+            ),
+            "https://fyi.com/low": _make_buzz_score(
+                "https://fyi.com/low", total_score=40.0, interest_score=80.0
+            ),
+        }
+
+        result = final_selector.select(judgments, buzz_scores=buzz_scores)
+
+        # THINK+high(73.0) > ACT_NOW+low(59.2) > FYI+low(24.0)
+        assert result.selected_articles[0].url == "https://think.com/high"
+        assert result.selected_articles[1].url == "https://act-now.com/low"
+        assert result.selected_articles[2].url == "https://fyi.com/low"
+
+    def test_composite_full_ordering(self, final_selector: FinalSelector) -> None:
+        """Composite Scoreによる完全なソート順を確認.
+
+        ACT_NOW+high: total=80, interest=100 → ext=55 → norm=73.3 → composite=84.0
+        THINK+high:   total=75, interest=55  → ext=61.25 → norm=81.7 → composite=73.0
+        FYI+high:     total=65, interest=30  → ext=57.5 → norm=76.7 → composite=54.0
+        FYI+low:      total=40, interest=80  → ext=20 → norm=26.7 → composite=24.0
+        """
+        judgments = [
+            self.create_judgment(
+                "https://d4.com/fyi-low", InterestLabel.FYI, BuzzLabel.LOW
+            ),
+            self.create_judgment(
+                "https://d3.com/fyi-high", InterestLabel.FYI, BuzzLabel.HIGH
+            ),
+            self.create_judgment(
+                "https://d1.com/act-now-high", InterestLabel.ACT_NOW, BuzzLabel.HIGH
+            ),
+            self.create_judgment(
+                "https://d2.com/think-high", InterestLabel.THINK, BuzzLabel.HIGH
+            ),
+        ]
+
+        buzz_scores = {
+            "https://d1.com/act-now-high": _make_buzz_score(
+                "https://d1.com/act-now-high", total_score=80.0, interest_score=100.0
+            ),
+            "https://d2.com/think-high": _make_buzz_score(
+                "https://d2.com/think-high", total_score=75.0, interest_score=55.0
+            ),
+            "https://d3.com/fyi-high": _make_buzz_score(
+                "https://d3.com/fyi-high", total_score=65.0, interest_score=30.0
+            ),
+            "https://d4.com/fyi-low": _make_buzz_score(
+                "https://d4.com/fyi-low", total_score=40.0, interest_score=80.0
+            ),
+        }
+
+        result = final_selector.select(judgments, buzz_scores=buzz_scores)
+
+        # ACT_NOW+high(84) > THINK+high(73) > FYI+high(54) > FYI+low(24)
+        assert result.selected_articles[0].url == "https://d1.com/act-now-high"
+        assert result.selected_articles[1].url == "https://d2.com/think-high"
+        assert result.selected_articles[2].url == "https://d3.com/fyi-high"
+        assert result.selected_articles[3].url == "https://d4.com/fyi-low"
+
+    def test_composite_without_buzz_scores_uses_label_only(
+        self, final_selector: FinalSelector
+    ) -> None:
+        """buzz_scores=Noneの場合、LABEL_SCOREのみでソートされることを確認."""
+        judgments = [
+            self.create_judgment(
+                "https://fyi.com/1", InterestLabel.FYI, BuzzLabel.LOW
+            ),
+            self.create_judgment(
+                "https://act-now.com/1", InterestLabel.ACT_NOW, BuzzLabel.LOW
+            ),
+            self.create_judgment(
+                "https://think.com/1", InterestLabel.THINK, BuzzLabel.LOW
+            ),
+        ]
+
+        result = final_selector.select(judgments)  # buzz_scores=None
+
+        # external_buzz=0のため、LABEL_SCOREのみ: ACT_NOW(40) > THINK(24) > FYI(8)
+        assert result.selected_articles[0].url == "https://act-now.com/1"
+        assert result.selected_articles[1].url == "https://think.com/1"
+        assert result.selected_articles[2].url == "https://fyi.com/1"
