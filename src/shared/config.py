@@ -111,7 +111,7 @@ def _load_config_local() -> AppConfig:
                 "DYNAMODB_HISTORY_TABLE", "ai-curated-newsletter-history"
             ),
             bedrock_model_id=os.getenv(
-                "BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0"
+                "BEDROCK_MODEL_ID", "anthropic.claude-haiku-4-5-20251001-v1:0"
             ),
             bedrock_inference_profile_arn=os.getenv("BEDROCK_INFERENCE_PROFILE_ARN", ""),
             bedrock_region=os.getenv("BEDROCK_REGION", "ap-northeast-1"),
@@ -122,7 +122,7 @@ def _load_config_local() -> AppConfig:
             bedrock_max_retries=int(os.getenv("BEDROCK_MAX_RETRIES", "4")),
             llm_candidate_max=int(os.getenv("LLM_CANDIDATE_MAX", "150")),
             final_select_max=int(os.getenv("FINAL_SELECT_MAX", "15")),
-            final_select_max_per_domain=int(os.getenv("FINAL_SELECT_MAX_PER_DOMAIN", "4")),
+            final_select_max_per_domain=int(os.getenv("FINAL_SELECT_MAX_PER_DOMAIN", "0")),
             sources_config_path=os.getenv("SOURCES_CONFIG_PATH", "config/sources.yaml"),
             from_email=os.getenv("FROM_EMAIL", "noreply@example.com"),
             to_email=os.getenv("TO_EMAIL", "recipient@example.com"),

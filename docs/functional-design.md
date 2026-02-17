@@ -71,7 +71,7 @@ graph TB
 | 実行環境 | AWS Lambda | サーバーレス、低コスト、自動スケール、週2-3回実行に最適 |
 | スケジューラ | AWS EventBridge | cron形式のスケジュール実行、Lambdaとのネイティブ連携 |
 | データストア | DynamoDB | サーバーレス、オンデマンドモード、キャッシュ・履歴保存に最適 |
-| LLM | AWS Bedrock (Claude 3.5 Sonnet) | JSON出力の信頼性、コスト効率、AWS統合 |
+| LLM | AWS Bedrock (Claude Haiku 4.5) | JSON出力の信頼性、コスト効率、AWS統合 |
 | 通知 | AWS SES | 低コスト、信頼性、HTMLメール対応 |
 | RSS/Atom解析 | feedparser | Python標準的なRSS/Atomパーサー |
 | HTTP クライアント | httpx | async対応、タイムアウト・リトライ機能 |
@@ -161,7 +161,7 @@ class JudgmentResult:
     buzz_label: BuzzLabel       # HIGH | MID | LOW
     confidence: float           # 0.0-1.0
     reason: str                 # 判定理由（最大200文字）
-    model_id: str               # 例: "claude-3-5-sonnet-20241022"
+    model_id: str               # 例: "claude-haiku-4-5-20251001"
     judged_at: datetime         # 判定日時（UTC）
 ```
 
@@ -723,7 +723,7 @@ class LlmJudge:
     def __init__(self,
                  bedrock_client: Any,
                  cache_repo: CacheRepository,
-                 model_id: str = "anthropic.claude-3-5-sonnet-20241022-v2:0",
+                 model_id: str = "anthropic.claude-haiku-4-5-20251001-v1:0",
                  max_parallel: int = 5) -> None:
         """LLM判定器を初期化する.
 
@@ -786,12 +786,12 @@ class FinalSelectionResult:
 class FinalSelector:
     """最終選定."""
 
-    def __init__(self, max_articles: int = 15, max_per_domain: int = 4) -> None:
+    def __init__(self, max_articles: int = 15, max_per_domain: int = 0) -> None:
         """最終選定器を初期化する.
 
         Args:
-            max_articles: 最大記事数（デフォルト: 12）
-            max_per_domain: 同一ドメイン最大数（デフォルト: 4）
+            max_articles: 最大記事数（デフォルト: 15）
+            max_per_domain: 同一ドメイン最大数（デフォルト: 0=制限なし）
         """
         ...
 
@@ -1350,7 +1350,7 @@ def select_final_articles(
     articles: List[Article],
     judgments: Dict[str, JudgmentResult],
     max_articles: int = 15,
-    max_per_domain: int = 4
+    max_per_domain: int = 0
 ) -> List[Article]:
     """最終的な通知記事を選定する.
 
@@ -1358,7 +1358,7 @@ def select_final_articles(
         articles: 記事リスト
         judgments: 判定結果辞書
         max_articles: 最大記事数
-        max_per_domain: 同一ドメイン最大数
+        max_per_domain: 同一ドメイン最大数（0=制限なし）
 
     Returns:
         選定された記事リスト（最大15件）

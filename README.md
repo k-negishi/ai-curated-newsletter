@@ -42,7 +42,7 @@ skills などの .claude ファイルは、自前の共通リポジトリ（http
 - 複数 RSS/Atom フィードの並列収集
 - URL 正規化と重複排除
 - Buzz スコア + 鮮度による LLM 判定候補（最大 150 件）選定
-- AWS Bedrock（Claude 3.5 Sonnet）での記事判定
+- AWS Bedrock（Claude 4.5 Haiku）による記事内容の判定
 - 最終選定（任意の件数、15件を想定）
 - AWS SES によるメール通知
 
@@ -61,7 +61,7 @@ EventBridge (火・金 09:00 UTC)
   -> Collector -> Normalizer -> Deduplicator -> BuzzScorer
   -> CandidateSelector (max 150)
   -> LlmJudge (Bedrock)
-  -> FinalSelector (max 15, max_per_domain 4)
+  -> FinalSelector (max 15, max_per_domain 0=制限なし)
   -> Formatter -> Notifier (SES)
 ```
 
@@ -98,9 +98,9 @@ LLM 判定候補件数の運用目安:
 - `LLM_CANDIDATE_MAX=120`（推奨）
 - 実装上の上限は 150（`CandidateSelector`）
 - コスト試算の前提（目安）:
-  - Claude 3.5 Sonnet v2 単価: input `$6/1M`、output `$30/1M`
+  - Claude Haiku 4.5 単価: input `$1/1M`、output `$5/1M`
   - 1記事あたり平均トークン: input `900`、output `140`
-  - 120件実行時の推定: 約 `$1.15/回`（週2回運用で約 `$9.22/月`）
+  - 120件実行時の推定: 約 `$0.19/回`（週2回運用で約 `$1.55/月`）
 
 Bedrock リトライ設定（ThrottlingException 対策）:
 

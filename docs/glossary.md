@@ -52,7 +52,7 @@ LLMが実行しないこと：
 - [Buzzスコア](#buzzスコア): 非LLMで計算する話題性スコア
 
 **使用例**:
-- 「LLM判断器として、Bedrock Claude 3.5 Sonnetを使用する」
+- 「LLM判断器として、Bedrock Claude Haiku 4.5を使用する」
 - 「LLM判断器は判定のみを行い、件数制御はOrchestratorで実行する」
 
 **実装箇所**: `src/services/llm_judge.py`
@@ -556,12 +556,12 @@ for entry in feed.entries:
 **公式サイト**: https://aws.amazon.com/bedrock/
 
 **本プロジェクトでの用途**:
-Claude 3.5 SonnetによるLLM判定（Interest Label、Buzz Label、理由の生成）。
+Claude Haiku 4.5によるLLM判定（Interest Label、Buzz Label、理由の生成）。
 
-**使用モデル**: `anthropic.claude-3-5-sonnet-20241022-v2:0`
+**使用モデル**: `anthropic.claude-haiku-4-5-20251001-v1:0`
 
 **選定理由**:
-- Claude 3.5 Sonnetへのマネージドアクセス
+- Claude Haiku 4.5へのマネージドアクセス
 - JSON出力の信頼性
 - AWSアカウント内で完結（セキュリティ）
 

@@ -20,11 +20,11 @@ def test_load_config_local_defaults() -> None:
             "DRY_RUN": "false",
             "DYNAMODB_CACHE_TABLE": "ai-curated-newsletter-cache",
             "DYNAMODB_HISTORY_TABLE": "ai-curated-newsletter-history",
-            "BEDROCK_MODEL_ID": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+            "BEDROCK_MODEL_ID": "anthropic.claude-haiku-4-5-20251001-v1:0",
             "BEDROCK_MAX_PARALLEL": "5",
             "LLM_CANDIDATE_MAX": "150",
             "FINAL_SELECT_MAX": "15",
-            "FINAL_SELECT_MAX_PER_DOMAIN": "4",
+            "FINAL_SELECT_MAX_PER_DOMAIN": "0",
             "SOURCES_CONFIG_PATH": "config/sources.yaml",
             "FROM_EMAIL": "noreply@example.com",
             "TO_EMAIL": "recipient@example.com",
@@ -38,12 +38,12 @@ def test_load_config_local_defaults() -> None:
         assert config.dry_run is False
         assert config.dynamodb_cache_table == "ai-curated-newsletter-cache"
         assert config.dynamodb_history_table == "ai-curated-newsletter-history"
-        assert config.bedrock_model_id == "anthropic.claude-3-5-sonnet-20241022-v2:0"
+        assert config.bedrock_model_id == "anthropic.claude-haiku-4-5-20251001-v1:0"
         assert config.bedrock_inference_profile_arn == ""
         assert config.bedrock_max_parallel == 5
         assert config.llm_candidate_max == 150
         assert config.final_select_max == 15
-        assert config.final_select_max_per_domain == 4
+        assert config.final_select_max_per_domain == 0
         assert config.sources_config_path == "config/sources.yaml"
         assert config.from_email == "noreply@example.com"
         assert config.to_email == "recipient@example.com"
@@ -193,7 +193,7 @@ def test_load_config_from_ssm_dotenv_parameter() -> None:
 DRY_RUN=true
 DYNAMODB_CACHE_TABLE=prod-cache
 DYNAMODB_HISTORY_TABLE=prod-history
-BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
+BEDROCK_MODEL_ID=anthropic.claude-haiku-4-5-20251001-v1:0
 BEDROCK_MAX_PARALLEL=8
 LLM_CANDIDATE_MAX=180
 FINAL_SELECT_MAX=15
@@ -221,7 +221,7 @@ TO_EMAIL=prod-to@example.com
     assert config.dry_run is True
     assert config.dynamodb_cache_table == "prod-cache"
     assert config.dynamodb_history_table == "prod-history"
-    assert config.bedrock_model_id == "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    assert config.bedrock_model_id == "anthropic.claude-haiku-4-5-20251001-v1:0"
     # BEDROCK_REGION が dotenv 内にない場合、AWS_REGION をフォールバックとして使う
     assert config.bedrock_region == "ap-northeast-1"
     assert config.bedrock_max_parallel == 8
@@ -242,7 +242,7 @@ def test_load_config_from_ssm_dotenv_parameter_missing_required() -> None:
     dotenv_content = """LOG_LEVEL=INFO
 DYNAMODB_CACHE_TABLE=prod-cache
 DYNAMODB_HISTORY_TABLE=prod-history
-BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
+BEDROCK_MODEL_ID=anthropic.claude-haiku-4-5-20251001-v1:0
 BEDROCK_MAX_PARALLEL=8
 LLM_CANDIDATE_MAX=180
 FINAL_SELECT_MAX=15

@@ -211,7 +211,7 @@
 **優先度**: P0(必須)
 
 **技術仕様**:
-- LLM: AWS Bedrock（Claude 3.5 Sonnet）
+- LLM: AWS Bedrock（Claude Haiku 4.5）
 - タイムアウト: 30秒/リクエスト
 - バッチ処理: 並列度5（同時に5件判定）
 
