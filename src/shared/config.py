@@ -120,7 +120,7 @@ def _load_config_local() -> AppConfig:
             bedrock_retry_base_delay=float(os.getenv("BEDROCK_RETRY_BASE_DELAY", "2.0")),
             bedrock_max_backoff=float(os.getenv("BEDROCK_MAX_BACKOFF", "20.0")),
             bedrock_max_retries=int(os.getenv("BEDROCK_MAX_RETRIES", "4")),
-            llm_candidate_max=int(os.getenv("LLM_CANDIDATE_MAX", "150")),
+            llm_candidate_max=int(os.getenv("LLM_CANDIDATE_MAX", "100")),
             final_select_max=int(os.getenv("FINAL_SELECT_MAX", "15")),
             final_select_max_per_domain=int(os.getenv("FINAL_SELECT_MAX_PER_DOMAIN", "0")),
             sources_config_path=os.getenv("SOURCES_CONFIG_PATH", "config/sources.yaml"),

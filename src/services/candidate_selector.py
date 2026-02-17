@@ -31,11 +31,11 @@ class CandidateSelector:
         _max_candidates: 最大候補数
     """
 
-    def __init__(self, max_candidates: int = 150) -> None:
+    def __init__(self, max_candidates: int = 100) -> None:
         """候補選定サービスを初期化する.
 
         Args:
-            max_candidates: 最大候補数（デフォルト: 150）
+            max_candidates: 最大候補数（デフォルト: 100）
         """
         self._max_candidates = max_candidates
 
