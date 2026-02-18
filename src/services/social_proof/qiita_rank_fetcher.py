@@ -52,7 +52,7 @@ class QiitaRankFetcher:
         if not urls:
             return {}
 
-        logger.info("qiita_fetch_batch_start", url_count=len(urls))
+        logger.debug("qiita_fetch_batch_start", url_count=len(urls))
 
         # Qiita URLとそれ以外を分離
         qiita_urls = []

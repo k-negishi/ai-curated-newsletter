@@ -122,7 +122,7 @@ class ExternalServicePolicy:
                 # リトライ時は待機
                 if attempt > 0:
                     delay = self._retry_delays[attempt - 1]
-                    logger.info("retrying_request", url=url, attempt=attempt, delay=delay)
+                    logger.debug("retrying_request", url=url, attempt=attempt, delay=delay)
                     await asyncio.sleep(delay)
 
                 try:

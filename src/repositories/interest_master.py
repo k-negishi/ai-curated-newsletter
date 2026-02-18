@@ -42,7 +42,7 @@ class InterestMaster:
         if self._profile is not None:
             return self._profile
 
-        logger.info("interest_profile_load_start", config_path=str(self._config_path))
+        logger.debug("interest_profile_load_start", config_path=str(self._config_path))
 
         if not self._config_path.exists():
             logger.error("interest_config_not_found", path=str(self._config_path))

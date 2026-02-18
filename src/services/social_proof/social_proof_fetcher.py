@@ -53,7 +53,7 @@ class SocialProofFetcher:
         if not urls:
             return {}
 
-        logger.info("social_proof_fetch_start", url_count=len(urls))
+        logger.debug("social_proof_fetch_start", url_count=len(urls))
 
         batches = self._split_batches(urls)
         logger.debug("social_proof_batch_split", batch_count=len(batches))

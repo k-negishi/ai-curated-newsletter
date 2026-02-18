@@ -27,7 +27,7 @@ class Normalizer:
         Returns:
             正規化された記事のリスト
         """
-        logger.info("normalization_start", article_count=len(articles))
+        logger.debug("normalization_start", article_count=len(articles))
 
         normalized_articles: list[Article] = []
 

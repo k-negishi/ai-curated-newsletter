@@ -53,7 +53,7 @@ class CandidateSelector:
         Returns:
             選定結果（上位max_candidates件）
         """
-        logger.info(
+        logger.debug(
             "candidate_selection_start",
             article_count=len(articles),
             max_candidates=self._max_candidates,

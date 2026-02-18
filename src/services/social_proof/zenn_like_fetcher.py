@@ -47,7 +47,7 @@ class ZennLikeFetcher:
         if not urls:
             return {}
 
-        logger.info("zenn_fetch_batch_start", url_count=len(urls))
+        logger.debug("zenn_fetch_batch_start", url_count=len(urls))
 
         # Zenn URLとそれ以外を分離
         zenn_urls = []
@@ -151,7 +151,7 @@ class ZennLikeFetcher:
 
                     current_page += 1
 
-            logger.info("zenn_ranking_fetch_complete", total_articles=len(ranking_map))
+            logger.debug("zenn_ranking_fetch_complete", total_articles=len(ranking_map))
 
         except httpx.HTTPError as e:
             logger.error("zenn_ranking_api_error", error=str(e))

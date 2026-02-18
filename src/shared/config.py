@@ -79,6 +79,8 @@ def load_config() -> AppConfig:
     """
     # .env ファイル読み込み（ローカル開発時のみ効果があります）
     load_dotenv(".env")
+    # .env.local があればローカル固有設定で上書き（ファイルが存在しなくても安全）
+    load_dotenv(".env.local", override=True)
 
     environment = os.getenv("ENVIRONMENT", "local")
 
@@ -99,7 +101,7 @@ def _load_config_local() -> AppConfig:
     Raises:
         ValueError: 必須設定が見つからない場合
     """
-    logger.info("loading_config_from_local_env")
+    logger.debug("loading_config_from_local_env")
 
     try:
         config = AppConfig(
@@ -149,7 +151,7 @@ def _load_config_from_ssm() -> AppConfig:
         ClientError: SSM Parameter Store へのアクセス失敗時
         ValueError: 必須パラメータが見つからない場合
     """
-    logger.info("loading_config_from_ssm_parameter_store")
+    logger.debug("loading_config_from_ssm_parameter_store")
 
     try:
         aws_region = os.getenv("AWS_REGION", "ap-northeast-1")
@@ -168,7 +170,7 @@ def _load_config_from_ssm() -> AppConfig:
             if value is not None
         }
 
-        logger.info(
+        logger.debug(
             "ssm_dotenv_loaded",
             parameter_name=parameter_name,
             count=len(dotenv_values_dict),

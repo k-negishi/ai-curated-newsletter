@@ -1,5 +1,6 @@
 """メール通知サービスモジュール."""
 
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -68,7 +69,8 @@ class Notifier:
         Raises:
             NotificationError: メール送信に失敗した場合
         """
-        logger.info(
+        start_time = time.time()
+        logger.debug(
             "notification_start",
             from_email=mask_email(self._from_email),
             to_email=mask_email(self._to_email),
@@ -78,7 +80,7 @@ class Notifier:
 
         # dry_run=true の場合、メール送信をスキップ
         if self._dry_run:
-            logger.info(
+            logger.debug(
                 "notification_skipped",
                 reason="dry_run_mode_enabled",
                 to_email=mask_email(self._to_email),
@@ -105,10 +107,12 @@ class Notifier:
             message_id = response["MessageId"]
             sent_at = now_utc()
 
+            elapsed = time.time() - start_time
             logger.info(
                 "notification_success",
                 message_id=message_id,
                 to_email=mask_email(self._to_email),
+                elapsed_seconds=round(elapsed, 2),
             )
 
             return NotificationResult(message_id=message_id, sent_at=sent_at)

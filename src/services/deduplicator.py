@@ -53,7 +53,7 @@ class Deduplicator:
         Returns:
             重複排除結果
         """
-        logger.info("deduplication_start", article_count=len(articles))
+        logger.debug("deduplication_start", article_count=len(articles))
 
         # ステップ1: URL重複排除（normalized_url で判定）
         seen_urls: set[str] = set()
@@ -85,7 +85,7 @@ class Deduplicator:
         if self._cache_repository is not None:
             cache_results = self._cache_repository.batch_exists(urls_to_check)
         else:
-            logger.info(
+            logger.debug(
                 "cache_check_skipped", message="CacheRepository is None, skipping cache check"
             )
             cache_results = {}  # 空辞書: 全記事がキャッシュヒットしていないとみなす

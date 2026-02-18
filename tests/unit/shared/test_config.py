@@ -237,6 +237,27 @@ TO_EMAIL=prod-to@example.com
     )
 
 
+def test_load_config_local_loads_env_local_with_override() -> None:
+    """ローカル環境で .env.local が .env を上書きすることを確認."""
+    with patch("src.shared.config.load_dotenv") as mock_load_dotenv:
+        # .env.local で LOG_LEVEL=DEBUG に上書きされるシナリオ
+        with patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "local",
+                "LOG_LEVEL": "DEBUG",
+            },
+            clear=False,
+        ):
+            config = load_config()
+
+        # load_dotenv が2回呼ばれる: .env, .env.local
+        assert mock_load_dotenv.call_count == 2
+        mock_load_dotenv.assert_any_call(".env")
+        mock_load_dotenv.assert_any_call(".env.local", override=True)
+        assert config.environment == "local"
+
+
 def test_load_config_from_ssm_dotenv_parameter_missing_required() -> None:
     """dotenv 内の必須値が欠けると ValueError になることを確認."""
     dotenv_content = """LOG_LEVEL=INFO

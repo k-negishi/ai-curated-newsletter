@@ -29,7 +29,7 @@ class Formatter:
         executed_at: datetime,
     ) -> str:
         """メール本文（プレーンテキスト）を生成する."""
-        logger.info("formatting_start", article_count=len(selected_articles))
+        logger.debug("formatting_start", article_count=len(selected_articles))
 
         act_now_articles = [
             a for a in selected_articles if a.interest_label == InterestLabel.ACT_NOW

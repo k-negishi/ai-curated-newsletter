@@ -187,7 +187,7 @@ class Orchestrator:
                 buzz_score = buzz_scores.get(judgment.url)
                 if buzz_score is not None:
                     judgment.buzz_label = buzz_score.to_buzz_label()
-            logger.info("step5_5_complete", message="buzz_labels overwritten from buzz_scores")
+            logger.debug("step5_5_complete", message="buzz_labels overwritten from buzz_scores")
 
             # Step 6: 最終選定
             final_result = self._final_selector.select(judgment_result.judgments, buzz_scores)
@@ -195,7 +195,7 @@ class Orchestrator:
             logger.info("step6_complete", selected_count=final_selected_count)
 
             # Step 7: フォーマット・通知
-            logger.info("step7_start", step="format_and_notify")
+            logger.debug("step7_start", step="format_and_notify")
 
             if final_selected_count == 0:
                 logger.warning("no_articles_to_notify")
@@ -222,7 +222,7 @@ class Orchestrator:
                         mail_body_length=len(mail_body),
                         selected_count=final_selected_count,
                     )
-                    logger.info("step7_complete", notification_sent=notification_sent)
+                    logger.debug("step7_complete", notification_sent=notification_sent)
                 else:
                     # メール送信
                     subject = self._build_newsletter_subject(executed_at)
@@ -237,7 +237,7 @@ class Orchestrator:
                     )
 
             # Step 8: 履歴保存
-            logger.info("step8_start", step="save_history")
+            logger.debug("step8_start", step="save_history")
             execution_time = time.time() - start_time
 
             # コスト推定（トークン単価ベース）
@@ -260,7 +260,7 @@ class Orchestrator:
             # self._history_repository.save(summary)
             # MVPフェーズではログ出力のみ（DynamoDB未使用）
             logger.info("execution_summary", **asdict(summary))
-            logger.info("step8_complete", run_id=run_id)
+            logger.debug("step8_complete", run_id=run_id)
 
             logger.info(
                 "orchestrator_complete",

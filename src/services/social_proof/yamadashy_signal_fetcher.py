@@ -49,7 +49,7 @@ class YamadashySignalFetcher:
         if not urls:
             return {}
 
-        logger.info("yamadashy_fetch_signals_start", url_count=len(urls))
+        logger.debug("yamadashy_fetch_signals_start", url_count=len(urls))
 
         # RSSを取得
         try:

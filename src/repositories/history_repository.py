@@ -84,7 +84,7 @@ class HistoryRepository:
         """
         # dry_run=true の場合、履歴保存をスキップ
         if self._dry_run:
-            logger.info(
+            logger.debug(
                 "history_save_skipped",
                 run_id=summary.run_id,
                 reason="dry_run_mode_enabled",

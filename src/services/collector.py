@@ -1,6 +1,7 @@
 """記事収集サービスモジュール."""
 
 import asyncio
+import time
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -56,8 +57,9 @@ class Collector:
         Returns:
             収集結果（記事リストとエラー情報）
         """
+        start_time = time.time()
         sources = self._source_master.get_enabled_sources()
-        logger.info("collection_start", source_count=len(sources))
+        logger.debug("collection_start", source_count=len(sources))
 
         # 並列収集
         tasks = [self._collect_from_source(source) for source in sources]
@@ -84,10 +86,12 @@ class Collector:
                     article_count=len(result),
                 )
 
+        elapsed = time.time() - start_time
         logger.info(
             "collection_complete",
             total_articles=len(all_articles),
             failed_sources=len(errors),
+            elapsed_seconds=round(elapsed, 2),
         )
 
         return CollectionResult(articles=all_articles, errors=errors)
