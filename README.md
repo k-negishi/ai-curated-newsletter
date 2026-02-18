@@ -93,18 +93,19 @@ uv pip install -e ".[dev]"
 
 `.env.example` をコピーして `.env` を作成し、必要に応じて編集してください。
 
-LLM 判定候補件数の運用目安:
+LLM 判定候補件数の設定:
 
-- `LLM_CANDIDATE_MAX=120`（推奨）
-- 実装上の上限は 100（`CandidateSelector`）
+- `LLM_CANDIDATE_MAX`: LLM判定に送る記事の最大件数
+  - コードデフォルト: `100`（config.py）
+  - `.env.example` 初期値: `120`（スロットリング状況に応じて調整）
 - コスト試算の前提（目安）:
   - Claude Haiku 4.5 単価: input `$1/1M`、output `$5/1M`
   - 1記事あたり平均トークン: input `900`、output `140`
-  - 120件実行時の推定: 約 `$0.19/回`（週2回運用で約 `$1.55/月`）
+  - 100件実行時の推定: 約 `$0.16/回`（週2回運用で約 `$1.29/月`）
 
 Bedrock リトライ設定（ThrottlingException 対策）:
 
-- `BEDROCK_MAX_PARALLEL=2`: 並列実行数（デフォルト: 5 → 推奨: 2）
+- `BEDROCK_MAX_PARALLEL`: 並列実行数（コードデフォルト: 5、スロットリング懸念時は 2〜4 に調整）
 - `BEDROCK_REQUEST_INTERVAL=2.5`: 並列リクエスト間隔（秒、デフォルト: 2.5）
 - `BEDROCK_RETRY_BASE_DELAY=2.0`: リトライ基本遅延時間（秒、デフォルト: 2.0）
 - `BEDROCK_MAX_BACKOFF=20.0`: 最大バックオフ時間（秒、デフォルト: 20.0）

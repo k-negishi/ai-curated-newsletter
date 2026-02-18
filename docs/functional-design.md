@@ -161,6 +161,8 @@ class JudgmentResult:
     description: str            # 記事の概要（最大800文字）
     interest_label: InterestLabel  # ACT_NOW | THINK | FYI | IGNORE
     buzz_label: BuzzLabel       # HIGH | MID | LOW
+                                # ※ LLMでは判定しない。BuzzScore.to_buzz_label()で
+                                #   Orchestratorが事後設定する（LlmJudge初期値: LOW）
     confidence: float           # 0.0-1.0
     summary: str                # LLM生成の要約（最大300文字）
     model_id: str               # 例: "claude-haiku-4-5-20251001"
@@ -271,6 +273,12 @@ def to_buzz_label(self) -> BuzzLabel:
 
 **external_buzzプロパティ**:
 interest成分を除外した外部話題性スコア（0-100正規化）。FinalSelectorのComposite Score計算で使用。
+
+```python
+# external_buzz の計算式（src/models/buzz_score.py）
+external_buzz = (total_score - interest_score × 0.35) / 0.65
+# clamp: min(max(raw, 0.0) / 0.65, 100.0)
+```
 
 ### エンティティ: ExecutionSummary（実行サマリ）
 
@@ -716,62 +724,58 @@ class CandidateSelector:
 
 **インターフェース**:
 ```python
-from typing import List, Dict
-
-@dataclass
-class JudgmentInput:
-    """LLM判定入力."""
-    article: Article            # 記事
-    interest_profile: str       # 関心プロファイル
+from typing import Any
 
 @dataclass
 class JudgmentBatchResult:
-    """バッチ判定結果."""
-    results: Dict[str, JudgmentResult]  # URLをキーとする判定結果
-    success_count: int          # 成功件数
-    failure_count: int          # 失敗件数
+    """LLM一括判定結果."""
+    judgments: list[JudgmentResult]  # 判定結果のリスト
+    failed_count: int                # 判定失敗件数
 
 class LlmJudge:
     """LLM判定."""
 
     def __init__(self,
                  bedrock_client: Any,
-                 cache_repo: CacheRepository,
-                 model_id: str = "anthropic.claude-haiku-4-5-20251001-v1:0",
-                 max_parallel: int = 5) -> None:
+                 cache_repository: CacheRepository | None,
+                 interest_profile: InterestProfile,
+                 model_id: str,
+                 inference_profile_arn: str = "",
+                 max_retries: int = 2,
+                 concurrency_limit: int = 5,
+                 request_interval: float = 0.0,
+                 retry_base_delay: float = 2.0,
+                 max_backoff: float = 20.0) -> None:
         """LLM判定器を初期化する.
 
         Args:
-            bedrock_client: Bedrock クライアント
-            cache_repo: キャッシュリポジトリ
-            model_id: LLMモデルID
-            max_parallel: 並列判定数（デフォルト: 5）
+            bedrock_client: Bedrock Runtimeクライアント
+            cache_repository: キャッシュリポジトリ（Noneでキャッシュ無効）
+            interest_profile: 関心プロファイル（コンストラクタ注入）
+            model_id: 使用するLLMモデルID
+            inference_profile_arn: クロスリージョン推論プロファイルARN（省略可）
+            max_retries: 最大リトライ回数（デフォルト: 2）
+            concurrency_limit: 並列度制限（デフォルト: 5）
+            request_interval: 並列リクエスト間隔（秒）
+            retry_base_delay: リトライの基本遅延時間（秒）
+            max_backoff: 最大バックオフ時間（秒）
         """
         ...
 
-    def judge_batch(self, inputs: List[JudgmentInput]) -> JudgmentBatchResult:
-        """記事を一括判定する.
+    async def judge_batch(self, articles: list[Article]) -> JudgmentBatchResult:
+        """記事を一括判定する（非同期）.
 
         Args:
-            inputs: 判定入力のリスト
+            articles: 判定対象記事のリスト
 
         Returns:
             バッチ判定結果
         """
         ...
 
-    def judge(self, input: JudgmentInput) -> JudgmentResult:
-        """単一記事を判定する.
-
-        Args:
-            input: 判定入力
-
-        Returns:
-            判定結果
-
-        Raises:
-            LlmJudgmentError: 判定失敗時（リトライ後）
-        """
+    # _judge_single は非公開の内部メソッド（外部からは呼び出さない）
+    async def _judge_single(self, article: Article) -> JudgmentResult:
+        """単一記事を判定する（非同期・内部メソッド）."""
         ...
 ```
 
@@ -805,13 +809,10 @@ LABEL_SCORE:
 
 **インターフェース**:
 ```python
-from typing import List, Dict
-
 @dataclass
 class FinalSelectionResult:
     """最終選定結果."""
-    selected_articles: List[Article]  # 選定された記事（最大15件）
-    judgments: Dict[str, JudgmentResult]  # 判定結果辞書
+    selected_articles: list[JudgmentResult]  # 選定された判定結果（最大15件）
 
 class FinalSelector:
     """最終選定."""
@@ -826,16 +827,16 @@ class FinalSelector:
         ...
 
     def select(self,
-               articles: List[Article],
-               judgments: Dict[str, JudgmentResult]) -> FinalSelectionResult:
+               judgments: list[JudgmentResult],
+               buzz_scores: dict[str, BuzzScore] | None = None) -> FinalSelectionResult:
         """最終的な通知記事を選定する.
 
         Args:
-            articles: 記事リスト
-            judgments: 判定結果辞書
+            judgments: LLM判定結果のリスト
+            buzz_scores: URL→BuzzScoreのマッピング（Noneの場合は全記事0.0扱い）
 
         Returns:
-            最終選定結果
+            最終選定結果（最大15件）
         """
         ...
 ```
@@ -1422,8 +1423,8 @@ def select_final_articles(
 
 ## セキュリティ考慮事項
 
-- **認証情報管理**: メールアドレス、APIキーはAWS Secrets Managerで管理
-- **最小権限原則**: Lambdaロールは必要最小限（DynamoDB R/W、Bedrock Invoke、SES Send、Secrets Manager Read）
+- **認証情報管理**: メールアドレス、APIキーはAWS SSM Parameter Store（SecureString）で管理（`/ai-curated-newsletter/dotenv`に.env形式で一括保存）
+- **最小権限原則**: Lambdaロールは必要最小限（DynamoDB R/W、Bedrock Invoke、SES Send、SSM Parameter Store Read）
 - **ログマスキング**: メールアドレスはログに出力しない
 - **VPC不要**: パブリックAPIのみ使用のため、VPC配置不要
 
@@ -1487,7 +1488,7 @@ class Collector:
 
 ### 統合テスト
 - コンポーネント間の連携テスト
-- LocalStack使用（DynamoDB、SES）
+- moto使用（Docker不要、DynamoDB・SESをモック）
 
 **シナリオ**:
 - 収集 → 正規化 → 重複排除フロー

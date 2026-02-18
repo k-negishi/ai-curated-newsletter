@@ -18,13 +18,13 @@
 | AWS Bedrock | LLMサービス | Claude Haiku 4.5へのマネージドアクセス、JSON出力の信頼性、AWSアカウント内で完結（セキュリティ）、従量課金（月$1以内の目標に対応、83%コスト削減） |
 | Amazon SES | メール送信 | 低コスト（$0.10/1000通）、高い到達率、HTMLメール対応、バウンス・苦情管理 |
 | Amazon S3 | 一時データ保存 | 将来のStep Functions化時のデータ受け渡しに使用（Phase 2）、設定ファイル保存 |
-| AWS Secrets Manager | 認証情報管理 | メールアドレス、通知先アドレスの安全な保存、自動ローテーション対応 |
+| AWS SSM Parameter Store | 認証情報管理 | Lambda起動時に動的取得 |
 
 ### フレームワーク・ライブラリ
 
 | 技術 | バージョン | 用途 | 選定理由 |
 |------|-----------|------|----------|
-| boto3 | 1.34+ | AWS SDK | AWS公式SDK、Lambda環境にプリインストール、DynamoDB/Bedrock/SES/Secrets Managerの操作 |
+| boto3 | 1.34+ | AWS SDK | AWS公式SDK、Lambda環境にプリインストール、DynamoDB/Bedrock/SES/SSM Parameter Storeの操作 |
 | feedparser | 6.0+ | RSS/Atom解析 | Python標準的なフィードパーサー、広範なフォーマット対応、安定性高い |
 | httpx | 0.27+ | HTTPクライアント | async/await対応、タイムアウト・リトライ機能、接続プール管理 |
 | structlog | 24.1+ | 構造化ログ | JSON形式ログ出力、CloudWatch Logs連携、run_id単位の追跡に最適 |
@@ -181,8 +181,10 @@
 ```python
 {
   "url": "https://example.com/article",
+  "title": "PostgreSQL Index Strategies",
+  "description": "フィードから取得した記事概要（最大800文字）",
   "interest_label": "ACT_NOW",
-  "buzz_label": "HIGH",
+  "buzz_label": "HIGH",  # ※ LLMでは判定しない。BuzzScore.to_buzz_label()でOrchestrator が事後設定
   "confidence": 0.85,
   "summary": "PostgreSQLのインデックス戦略について実践的な知見を解説した記事",
   "model_id": "anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -233,26 +235,6 @@
 - 週2回実行 = 月8件書き込み × $1.25/百万 = $0.00001
 - 合計: **月$0.00001**
 
-### S3 バケット設計（Phase 2用）
-
-| バケット | 用途 | ライフサイクル |
-|---------|------|--------------|
-| `ai-curated-newsletter-temp` | Lambda間データ受け渡し | 1日後に自動削除 |
-| `ai-curated-newsletter-config` | 収集元マスタ設定 | 永続保存 |
-
-**Phase 1では未使用**（Phase 2移行時に作成）
-
-### バックアップ戦略
-
-**DynamoDB Point-in-Time Recovery (PITR):**
-- 有効化: Yes
-- 保存期間: 35日間
-- 追加コスト: ストレージサイズに応じて（推定月$0.20）
-
-**目的:**
-- 誤削除・障害時の復旧
-- 判定キャッシュの保護（再判定禁止の原則）
-
 ## パフォーマンス要件
 
 ### レスポンスタイム目標
@@ -275,20 +257,6 @@
 | 同時実行数 | 1 | 週2-3回の定期実行のため、同時実行は不要 |
 | 環境変数 | 以下を設定 | |
 
-**環境変数:**
-```bash
-ENVIRONMENT=production
-LOG_LEVEL=INFO
-DYNAMODB_CACHE_TABLE=ai-curated-newsletter-cache
-DYNAMODB_HISTORY_TABLE=ai-curated-newsletter-history
-SOURCE_CONFIG_S3_BUCKET=ai-curated-newsletter-config
-SOURCE_CONFIG_S3_KEY=sources.yaml
-BEDROCK_MODEL_ID=anthropic.claude-haiku-4-5-20251001-v1:0
-BEDROCK_MAX_PARALLEL=5
-LLM_CANDIDATE_MAX=100
-FINAL_SELECT_MAX=15
-FINAL_SELECT_MAX_PER_DOMAIN=0  # 0=制限なし、正の整数で制限を有効化
-```
 
 ### リソース使用量
 
@@ -297,126 +265,6 @@ FINAL_SELECT_MAX_PER_DOMAIN=0  # 0=制限なし、正の整数で制限を有効
 | メモリ | 600-800MB | 1024MB | フィード解析、JSON処理、LLM応答の一時保存 |
 | CPU | 60-80% | 100% | LLM API待機時間が多いため、CPU使用率は低め |
 | ネットワーク | 20-30MB | 無制限 | RSS/Atom取得（数MB）、Bedrock API（数MB） |
-
-## セキュリティアーキテクチャ
-
-### データ保護
-
-**機密情報管理:**
-```
-AWS Secrets Manager:
-- secret/ai-curated-newsletter/email
-  - to_address: 通知先メールアドレス
-  - from_address: 送信元メールアドレス（SES検証済み）
-```
-
-**DynamoDBアクセス制御:**
-- Lambda実行ロールに最小権限付与
-- 許可操作: `GetItem`, `PutItem`, `BatchGetItem`, `Query`（2テーブルのみ）
-- 拒否操作: `Scan`, `DeleteTable`, `UpdateTable`
-
-**Bedrockアクセス制御:**
-- 許可操作: `InvokeModel`（Claude Haiku 4.5のみ）
-- リージョン制限: `us-east-1`のみ
-
-### 入力検証
-
-**収集元マスタのバリデーション:**
-```python
-from enum import Enum
-from pydantic import BaseModel, HttpUrl, Field
-
-
-class FeedType(str, Enum):
-    """フィード種別."""
-    RSS = "rss"
-    ATOM = "atom"
-
-
-class Priority(str, Enum):
-    """優先度."""
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
-
-
-class SourceConfig(BaseModel):
-    """収集元設定（バリデーション付き）."""
-    source_id: str = Field(min_length=1, max_length=50, pattern="^[a-z0-9_]+$")
-    name: str = Field(min_length=1, max_length=100)
-    feed_url: HttpUrl  # URLフォーマット検証
-    feed_type: FeedType
-    priority: Priority
-    timeout_seconds: int = Field(ge=5, le=30)  # 5-30秒
-    retry_count: int = Field(ge=0, le=5)  # 0-5回
-    enabled: bool
-```
-
-**LLM出力のバリデーション:**
-```python
-from enum import Enum
-from pydantic import BaseModel, Field
-
-
-class InterestLabel(str, Enum):
-    """関心度ラベル."""
-    ACT_NOW = "ACT_NOW"
-    THINK = "THINK"
-    FYI = "FYI"
-    IGNORE = "IGNORE"
-
-
-class BuzzLabel(str, Enum):
-    """話題性ラベル."""
-    HIGH = "HIGH"
-    MID = "MID"
-    LOW = "LOW"
-
-
-class JudgmentOutput(BaseModel):
-    """LLM判定出力（バリデーション付き）."""
-    interest_label: InterestLabel
-    confidence: float = Field(ge=0.0, le=1.0)
-    summary: str = Field(min_length=1, max_length=300)
-    tags: list[str] = Field(default_factory=list)
-```
-
-### ログマスキング
-
-**機密情報のマスキング:**
-```python
-import structlog
-
-# メールアドレスをマスク
-def mask_email(email: str) -> str:
-    """メールアドレスをマスクする."""
-    local, domain = email.split("@")
-    return f"{local[:2]}***@{domain}"
-
-logger.info(
-    "notification_sent",
-    to_address=mask_email(to_address),  # "us***@example.com"
-    article_count=10
-)
-```
-
-## スケーラビリティ設計
-
-### データ増加への対応
-
-**想定データ量:**
-- 判定キャッシュ: 年間5,000件 × 5年 = 25,000件（約10MB）
-- 実行履歴: 年間100件 × 5年 = 500件（約1MB）
-
-**パフォーマンス劣化対策:**
-- DynamoDBオンデマンドモード（自動スケール）
-- BatchGetItemによる一括取得（最大100件/リクエスト）
-- GSI不要（単純なPK/SK検索のみ）
-
-**アーカイブ戦略:**
-- 実行履歴はTTL 90日で自動削除
-- 判定キャッシュは永続保存（再判定禁止の原則）
-- 5年後に25,000件でも性能問題なし
 
 ### 収集元の拡張性
 
@@ -615,7 +463,7 @@ def measure_execution_time(func):
 
 | 項目 | 制約 |
 |------|------|
-| 機密情報管理 | AWS Secrets Manager必須（ハードコード禁止） |
+| 機密情報管理 | AWS SSM Parameter Store（SecureString）必須（ハードコード禁止） |
 | ログ出力 | メールアドレスのマスキング必須 |
 | IAMロール | 最小権限の原則（必要な操作のみ許可） |
 | VPC | 不要（パブリックAPIのみ使用） |
@@ -631,266 +479,9 @@ def measure_execution_time(func):
 | DynamoDB | $0.50 | オンデマンド（読み書き + ストレージ） |
 | Bedrock | $0.58 | 週2回 × 100件 × Claude Haiku 4.5料金（input $1.00/1M, output $5.00/1M） |
 | SES | $0.01 | 週2回 × $0.10/1000通 |
-| Secrets Manager | $0.40 | 1シークレット × $0.40/月 |
+| SSM Parameter Store | $0.00 | SecureString 1パラメータ × 無料枠内 |
 | S3 | $0.10 | 設定ファイル保存（Phase 2で一時データ追加） |
 | EventBridge | $0.00 | 無料枠内（月100万イベント） |
 | CloudWatch Logs | $0.50 | ログ保存（5GB/月） |
 | **合計** | **$3.09** | **大幅削減（$10以内、従来比$3.30削減）** |
 
-## 依存関係管理
-
-### バージョン管理方針
-
-**pyproject.toml:**
-```toml
-[project]
-name = "ai-curated-newsletter"
-version = "0.1.0"
-requires-python = ">=3.14"
-dependencies = [
-    "boto3>=1.34.0",
-    "feedparser>=6.0.0",
-    "httpx>=0.27.0",
-    "structlog>=24.1.0",
-    "pydantic>=2.6.0",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.0.0",
-    "pytest-asyncio>=0.23.0",
-    "mypy>=1.8.0",
-    "ruff>=0.2.0",
-    "moto>=5.0.0",
-    "boto3-stubs>=1.34.0",
-]
-```
-
-**依存関係管理コマンド（uv）:**
-```bash
-# 依存関係のインストール
-uv pip install -e .
-
-# 開発依存関係のインストール
-uv pip install -e ".[dev]"
-
-# requirements.txt 生成（Lambda デプロイ用）
-uv pip compile pyproject.toml -o requirements.txt
-
-# 依存関係の更新
-uv pip compile --upgrade pyproject.toml -o requirements.txt
-uv pip sync requirements.txt
-```
-
-**方針:**
-- `>=` で最低バージョンを指定（柔軟性とセキュリティパッチ対応）
-- boto3は頻繁に更新されるため最低バージョンのみ指定
-- requirements.txt で厳密なバージョン固定（再現性）
-- 月次で依存関係を更新（`uv pip compile --upgrade`）
-- uvの超高速依存解決（Rust製、Poetry比10-100倍高速）
-
-### Lambda レイヤー構成
-
-**レイヤー1: 依存ライブラリ**
-- feedparser
-- httpx
-- structlog
-- pydantic
-
-**レイヤー2: boto3（オプション）**
-- Lambda環境にプリインストールされているが、バージョン固定のため含める
-
-**サイズ制約:**
-- 合計50MB以内（ZIP圧縮後）
-- 超過する場合はDocker Lambdaを検討
-
-## デプロイ戦略
-
-### Infrastructure as Code
-
-**ツール:** AWS SAM (Serverless Application Model)
-
-**template.yaml 概要:**
-```yaml
-AWSTemplateFormatVersion: '2010-09-09'
-Transform: AWS::Serverless-2016-10-31
-
-Globals:
-  Function:
-    Runtime: python3.14
-    MemorySize: 1024
-    Timeout: 900
-    Environment:
-      Variables:
-        ENVIRONMENT: production
-        LOG_LEVEL: INFO
-
-Resources:
-  NewsletterFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: src.handler.lambda_handler
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref CacheTable
-        - DynamoDBCrudPolicy:
-            TableName: !Ref HistoryTable
-        - Statement:
-            - Effect: Allow
-              Action: bedrock:InvokeModel
-              Resource: !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-haiku-4-5-*
-        - SESCrudPolicy:
-            IdentityName: !Ref SenderEmail
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Ref EmailSecret
-      Events:
-        Schedule:
-          Type: Schedule
-          Properties:
-            Schedule: cron(0 9 * * TUE,FRI *)  # 火曜・金曜 09:00 UTC
-
-  CacheTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: ai-curated-newsletter-cache
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: PK
-          AttributeType: S
-        - AttributeName: SK
-          AttributeType: S
-      KeySchema:
-        - AttributeName: PK
-          KeyType: HASH
-        - AttributeName: SK
-          KeyType: RANGE
-      PointInTimeRecoverySpecification:
-        PointInTimeRecoveryEnabled: true
-
-  HistoryTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: ai-curated-newsletter-history
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: PK
-          AttributeType: S
-        - AttributeName: SK
-          AttributeType: S
-      KeySchema:
-        - AttributeName: PK
-          KeyType: HASH
-        - AttributeName: SK
-          KeyType: RANGE
-      TimeToLiveSpecification:
-        Enabled: true
-        AttributeName: ttl
-```
-
-### CI/CD パイプライン（Phase 2）
-
-**Phase 1:** 手動デプロイ
-```bash
-# 依存関係のインストール
-uv pip install -e ".[dev]"
-
-# テスト
-pytest
-mypy src/
-
-# Lambda デプロイ用requirements.txt生成
-uv pip compile pyproject.toml -o requirements.txt
-
-# デプロイ
-sam build
-sam deploy --guided
-```
-
-**Phase 2:** GitHub Actions
-- プルリクエスト: テスト実行
-- mainブランチマージ: 自動デプロイ
-
-## モニタリング・アラート
-
-### CloudWatch Logs
-
-**ログ構造:**
-```json
-{
-  "timestamp": "2025-01-15T09:00:00.000Z",
-  "level": "info",
-  "event": "orchestrator_started",
-  "run_id": "550e8400-e29b-41d4-a716-446655440000",
-  "dry_run": false
-}
-```
-
-**保存期間:** 30日
-
-### CloudWatch Metrics
-
-**カスタムメトリクス:**
-- `CollectedArticleCount`: 収集件数
-- `LlmJudgedCount`: LLM判定件数
-- `FinalSelectedCount`: 最終選定件数
-- `ExecutionTimeSeconds`: 実行時間
-- `EstimatedCostUSD`: 推定コスト
-
-### アラート設定（Phase 2）
-
-**SNS トピック:** `ai-curated-newsletter-alerts`
-
-**アラート条件:**
-1. Lambda実行失敗
-2. 実行時間が12分を超える
-3. 最終選定件数が0件（3回連続）
-
-## 将来の拡張パス
-
-### Step Functions化への移行手順
-
-1. **準備:**
-   - S3バケット作成（`ai-curated-newsletter-temp`）
-   - Orchestratorを3つのLambdaに分割
-
-2. **Lambda分割:**
-   ```
-   Lambda 1: collect_and_prepare.py
-   Lambda 2: judge_articles.py
-   Lambda 3: select_and_notify.py
-   ```
-
-3. **State Machine定義:**
-   ```yaml
-   StartAt: CollectAndPrepare
-   States:
-     CollectAndPrepare:
-       Type: Task
-       Resource: !GetAtt Lambda1.Arn
-       Next: JudgeArticles
-
-     JudgeArticles:
-       Type: Task
-       Resource: !GetAtt Lambda2.Arn
-       Next: SelectAndNotify
-
-     SelectAndNotify:
-       Type: Task
-       Resource: !GetAtt Lambda3.Arn
-       End: true
-   ```
-
-4. **EventBridge変更:**
-   - Lambda直接実行 → Step Functions実行
-
-5. **テスト・デプロイ:**
-   - dry_runモードで動作確認
-   - 本番環境デプロイ
-
-### コスト影響
-
-**追加コスト:**
-- Step Functions: 月$0.0006
-- S3: 月$0.01
-
-**合計:** 月$3.10（大幅削減、依然として$10以内）
