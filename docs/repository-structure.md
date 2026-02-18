@@ -33,16 +33,19 @@ ai-curated-newsletter/
 │   │   ├── __init__.py
 │   │   ├── cache_repository.py    # 判定キャッシュ（DynamoDB）
 │   │   ├── history_repository.py  # 実行履歴（DynamoDB）
-│   │   └── source_master.py       # 収集元マスタ（S3/設定ファイル）
+│   │   ├── source_master.py       # 収集元マスタ（S3/設定ファイル）
+│   │   └── interest_master.py   # 関心プロファイル（interests.yaml）
 │   ├── models/               # データモデル（dataclass）
 │   │   ├── __init__.py
 │   │   ├── article.py        # 記事エンティティ
 │   │   ├── judgment.py       # 判定結果エンティティ
 │   │   ├── buzz_score.py     # Buzzスコアエンティティ
+│   │   ├── interest_profile.py  # 関心プロファイルエンティティ
 │   │   ├── execution_summary.py   # 実行サマリ
 │   │   └── source_config.py  # 収集元設定
 │   └── shared/               # 共通ユーティリティ
 │       ├── __init__.py
+│       ├── config.py          # アプリケーション設定管理
 │       ├── utils/            # 汎用ユーティリティ
 │       │   ├── __init__.py
 │       │   ├── url_normalizer.py  # URL正規化
@@ -83,7 +86,8 @@ ai-curated-newsletter/
 │       ├── test_normal_flow.py           # 正常系フロー
 │       └── test_error_handling_flow.py   # 異常系フロー
 ├── config/                   # 設定ファイル
-│   └── sources.yaml          # 収集元マスタ（Phase 1）
+│   ├── sources.yaml          # 収集元マスタ（Phase 1）
+│   └── interests.yaml        # 関心プロファイル定義
 ├── docs/                     # プロジェクトドキュメント
 │   ├── product-requirements.md
 │   ├── functional-design.md
@@ -256,6 +260,7 @@ class Normalizer:
 - `cache_repository.py`: 判定キャッシュの読み書き（DynamoDB）
 - `history_repository.py`: 実行履歴の保存（DynamoDB）
 - `source_master.py`: 収集元マスタの読み込み（S3/設定ファイル）
+- `interest_master.py`: 関心プロファイルの読み込み（config/interests.yaml）
 
 **命名規則**:
 - クラス名: `[Entity]Repository`（例: `CacheRepository`）
@@ -304,6 +309,7 @@ class CacheRepository:
 - `article.py`: 記事エンティティ
 - `judgment.py`: 判定結果エンティティ
 - `buzz_score.py`: Buzzスコアエンティティ
+- `interest_profile.py`: 関心プロファイルエンティティ
 - `execution_summary.py`: 実行サマリ
 - `source_config.py`: 収集元設定
 
@@ -494,6 +500,7 @@ tests/e2e/
 
 **配置ファイル**:
 - `sources.yaml`: 収集元マスタ（Phase 1）
+- `interests.yaml`: 関心プロファイル定義
 
 **Phase 2での拡張**:
 - DynamoDBテーブルに移行
@@ -595,6 +602,7 @@ tests/e2e/
 | Lambda デプロイ用 | プロジェクトルート | `requirements.txt` |
 | AWS SAM テンプレート | プロジェクトルート | `template.yaml` |
 | 収集元マスタ | `config/` | `sources.yaml` |
+| 関心プロファイル | `config/` | `interests.yaml` |
 | Git除外設定 | プロジェクトルート | `.gitignore` |
 
 ## 命名規則

@@ -63,7 +63,7 @@
 │ │  ├─ Step 2: Deduplicate                            │ │
 │ │  ├─ Step 3: Calculate Buzz Score                   │ │
 │ │  ├─ Step 4: Select Candidates                      │ │
-│ │  ├─ Step 5: LLM Judge (最大150件)                  │ │
+│ │  ├─ Step 5: LLM Judge (最大100件)                  │ │
 │ │  ├─ Step 6: Final Select (最大15件)                │ │
 │ │  ├─ Step 7: Format & Notify                        │ │
 │ │  └─ Step 8: Save History                           │ │
@@ -123,7 +123,7 @@
 **移行トリガー:**
 - 実行時間が12分を超える場合
 - 収集元が大幅に増える場合
-- LLM判定対象を150件以上に拡大する場合
+- LLM判定対象を100件以上に拡大する場合
 
 **移行コスト:**
 - Step Functions: 月24遷移 × $0.000025 = $0.0006
@@ -184,21 +184,23 @@
   "interest_label": "ACT_NOW",
   "buzz_label": "HIGH",
   "confidence": 0.85,
-  "reason": "PostgreSQLのインデックス戦略について実践的な知見",
+  "summary": "PostgreSQLのインデックス戦略について実践的な知見を解説した記事",
   "model_id": "anthropic.claude-haiku-4-5-20251001-v1:0",
   "judged_at": "2025-01-15T10:30:00Z",
+  "published_at": "2025-01-14T08:00:00Z",
   "title": "PostgreSQL Index Strategies",
-  "source_name": "Hacker News"
+  "source_name": "Hacker News",
+  "tags": ["PostgreSQL", "Database"]
 }
 ```
 
 **TTL:** なし（永続的にキャッシュ、再判定禁止の原則）
 
 **推定コスト:**
-- 週2回実行 × 120件判定 = 月960件書き込み
-- 月960件 × $1.25/百万 = $0.0012
+- 週2回実行 × 100件判定 = 月800件書き込み
+- 月800件 × $1.25/百万 = $0.0010
 - 読み込み（重複チェック）: 週2回 × 400件 = 月3200件 × $0.25/百万 = $0.0008
-- 合計: **月$0.002**
+- 合計: **月$0.0018**
 
 #### テーブル2: 実行履歴
 
@@ -260,7 +262,7 @@
 | RSS/Atom収集（全ソース） | 30秒以内 | Lambda 1024MB | 並列収集、各ソース10秒タイムアウト |
 | 正規化・重複排除 | 10秒以内 | Lambda 1024MB | DynamoDB BatchGetItem使用 |
 | Buzzスコア計算 | 5秒以内 | Lambda 1024MB | 純粋な計算処理 |
-| LLM判定（120件） | 5分以内 | Lambda 1024MB | 並列5件ずつ、24バッチ |
+| LLM判定（100件） | 5分以内 | Lambda 1024MB | 並列5件ずつ、20バッチ |
 | 最終選定・フォーマット・通知 | 30秒以内 | Lambda 1024MB | SES送信含む |
 | **全体実行時間** | **10分以内（目標）** | Lambda 1024MB | **15分制限の67%** |
 
@@ -283,7 +285,7 @@ SOURCE_CONFIG_S3_BUCKET=ai-curated-newsletter-config
 SOURCE_CONFIG_S3_KEY=sources.yaml
 BEDROCK_MODEL_ID=anthropic.claude-haiku-4-5-20251001-v1:0
 BEDROCK_MAX_PARALLEL=5
-LLM_CANDIDATE_MAX=150
+LLM_CANDIDATE_MAX=100
 FINAL_SELECT_MAX=15
 FINAL_SELECT_MAX_PER_DOMAIN=0  # 0=制限なし、正の整数で制限を有効化
 ```
@@ -374,9 +376,9 @@ class BuzzLabel(str, Enum):
 class JudgmentOutput(BaseModel):
     """LLM判定出力（バリデーション付き）."""
     interest_label: InterestLabel
-    buzz_label: BuzzLabel
     confidence: float = Field(ge=0.0, le=1.0)
-    reason: str = Field(min_length=1, max_length=200)
+    summary: str = Field(min_length=1, max_length=300)
+    tags: list[str] = Field(default_factory=list)
 ```
 
 ### ログマスキング
@@ -604,7 +606,7 @@ def measure_execution_time(func):
 | 項目 | 制約 | 理由 |
 |------|------|------|
 | Lambda実行時間 | 15分以内 | AWS Lambda最大タイムアウト |
-| LLM判定対象 | 最大150件 | コスト制約（月$4）、処理時間制約（5分以内） |
+| LLM判定対象 | 最大100件 | コスト制約（月$4）、処理時間制約（5分以内） |
 | 最終通知件数 | 最大15件 | 出力最小主義の原則（PRD絶対制約） |
 | Bedrock並列度 | 5件 | レート制限・安定性のバランス |
 | RSS/Atomタイムアウト | 10秒/ソース | 全体実行時間への影響を最小化 |
@@ -627,13 +629,13 @@ def measure_execution_time(func):
 |---------|-----------|------|
 | Lambda | $1.00 | 週2回 × 10分 × $0.0000166667/GB秒 × 1GB |
 | DynamoDB | $0.50 | オンデマンド（読み書き + ストレージ） |
-| Bedrock | $0.70 | 週2回 × 120件 × Claude Haiku 4.5料金（input $1.00/1M, output $5.00/1M） |
+| Bedrock | $0.58 | 週2回 × 100件 × Claude Haiku 4.5料金（input $1.00/1M, output $5.00/1M） |
 | SES | $0.01 | 週2回 × $0.10/1000通 |
 | Secrets Manager | $0.40 | 1シークレット × $0.40/月 |
 | S3 | $0.10 | 設定ファイル保存（Phase 2で一時データ追加） |
 | EventBridge | $0.00 | 無料枠内（月100万イベント） |
 | CloudWatch Logs | $0.50 | ログ保存（5GB/月） |
-| **合計** | **$3.21** | **大幅削減（$10以内、従来比$3.30削減）** |
+| **合計** | **$3.09** | **大幅削減（$10以内、従来比$3.30削減）** |
 
 ## 依存関係管理
 
@@ -891,4 +893,4 @@ sam deploy --guided
 - Step Functions: 月$0.0006
 - S3: 月$0.01
 
-**合計:** 月$3.22（大幅削減、依然として$10以内）
+**合計:** 月$3.10（大幅削減、依然として$10以内）

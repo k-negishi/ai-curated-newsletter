@@ -4,7 +4,7 @@
 
 このドキュメントは、`ai-curated-newsletter` プロジェクト内で使用される用語の定義を管理します。
 
-**更新日**: 2025-01-15
+**更新日**: 2026-02-18
 
 ---
 
@@ -49,7 +49,6 @@ LLMが実行しないこと：
 
 **関連用語**:
 - [Interest Label](#interest-label): LLMが判定する関心度ラベル
-- [Buzz Label](#buzz-label): LLMが判定する話題性ラベル
 - [Buzzスコア](#buzzスコア): 非LLMで計算する話題性スコア
 
 **使用例**:
@@ -65,30 +64,35 @@ LLMが実行しないこと：
 **定義**: 記事の話題性を定量化する非LLM計算スコア（0-100点）
 
 **説明**:
-以下の要素から算出される：
-- 複数ソース出現数（40%）
-- 鮮度（50%）
-- ドメイン多様性（10%）
+以下の3要素から算出される：
+- SocialProof（外部反応）: 4指標統合スコア（55%）
+- Interest（興味との一致度）: InterestProfileとの5段階マッチング（35%）
+- Authority（公式補正）: authority_levelに応じたスコア（10%）
 
 LLMは使用せず、純粋なアルゴリズムで計算する。
 
 **計算式**:
 ```
-total_score = (source_count_score * 0.4) + (recency_score * 0.5) + (domain_diversity_score * 0.1)
+total_score = (social_proof × 0.55) + (interest × 0.35) + (authority × 0.10)
 
 where:
-  source_count_score = min(source_count * 20, 100)  # 5ソース以上で100点
-  recency_score = 100 * max(0, 1 - (days_elapsed / 10))  # 10日で0点
-  domain_diversity_score = unique_domains / total_sources * 100
+  # SocialProof 4指標統合スコア（55%）
+  social_proof_score = yamadashy × 0.05 + hatena × 0.45 + zenn × 0.35 + qiita × 0.15
+
+  # Interest 5段階マッチングスコア（35%）
+  interest_score = max: 100, high: 80, medium: 55, low: 30, ignore: 0, デフォルト: 15
+
+  # Authority スコア（10%）
+  authority_score = OFFICIAL: 100, HIGH: 80, MEDIUM: 50, LOW/未設定: 0
 ```
 
 **関連用語**:
-- [鮮度スコア](#鮮度スコア): Buzzスコアの構成要素
 - [候補選定](#候補選定): Buzzスコアでソートして上位を選定
+- [Composite Score](#composite-score): Buzzスコアのexternal_buzzがComposite Scoreの構成要素
 
 **使用例**:
 - 「Buzzスコア80点以上の記事を優先的にLLM判定に回す」
-- 「複数ソースで言及された記事はBuzzスコアが高くなる」
+- 「SocialProof（外部反応）が高い記事はBuzzスコアが高くなる」
 
 **実装箇所**: `src/services/buzz_scorer.py`
 
@@ -96,30 +100,19 @@ where:
 
 ### 鮮度スコア
 
-**定義**: 記事の公開日時からの経過日数に基づくスコア（0-100点）
+**定義**: 記事の公開日時・判定日時に基づく時間的な優先度指標
 
 **説明**:
-公開からの経過日数に応じて減衰するスコア。本日公開は100点、10日以上前は0点。
-
-**計算式**:
-```
-recency_score = 100 * max(0, 1 - (days_elapsed / 10))
-
-例:
-- 本日公開: 100点
-- 3日前: 70点
-- 7日前: 30点
-- 10日以上前: 0点
-```
+BuzzScoreの直接的な構成要素ではなくなったが、最終選定（FinalSelector）において
+Composite Scoreが同値の場合のソートキー（judged_at降順）として使用される。
 
 **関連用語**:
-- [Buzzスコア](#buzzスコア): 鮮度スコアはBuzzスコアの構成要素（50%）
+- [Buzzスコア](#buzzスコア): 鮮度はBuzzスコアの直接的な構成要素ではない
+- [最終選定](#最終選定): Composite Score同値時のソートキーとして使用
 
 **使用例**:
-- 「鮮度スコアが高い記事を優先する」
-- 「10日以上前の記事は鮮度スコアが0点になる」
-
-**実装箇所**: `src/services/buzz_scorer.py` の `calculate_recency_score()`
+- 「Composite Scoreが同値の場合、鮮度（judged_at降順）でソートする」
+- 「より新しい記事が同スコアであれば優先される」
 
 **英語表記**: Recency Score
 
@@ -318,14 +311,14 @@ enabled: true
 
 ### 候補選定
 
-**定義**: Buzzスコアと鮮度でソートし、上位最大150件をLLM判定対象として選定するプロセス
+**定義**: Buzzスコアでソートし、上位最大100件をLLM判定対象として選定するプロセス
 
 **説明**:
-重複排除後の記事をBuzzスコア順にソートし、上位150件（推奨120件）をLLM判定に回す。これによりLLM判定コストを制御する。
+重複排除後の記事をBuzzスコア順にソートし、上位最大100件をLLM判定に回す。これによりLLM判定コストを制御する。
 
 **選定基準**:
 1. Buzzスコアでソート（降順）
-2. 上位最大150件を選定
+2. 上位最大100件を選定
 3. キャッシュヒットは除外（再判定禁止）
 
 **関連用語**:
@@ -333,7 +326,7 @@ enabled: true
 - [最終選定](#最終選定): LLM判定後、最大15件への絞り込み
 
 **使用例**:
-- 「候補選定により、LLM判定対象を150件以内に制限する」
+- 「候補選定により、LLM判定対象を100件以内に制限する」
 - 「候補選定はBuzzスコア順で実行する」
 
 **実装箇所**: `src/services/candidate_selector.py`
@@ -342,30 +335,74 @@ enabled: true
 
 ### 最終選定
 
-**定義**: LLM判定後、Interest Labelの優先順位に従って最大15件に絞り込むプロセス
+**定義**: LLM判定済みの記事をComposite Scoreで統合的にソートし、最大15件に絞り込むプロセス
 
 **説明**:
-LLM判定済みの記事を以下の基準で最大15件に絞り込む：
-1. Interest Label優先順位（ACT_NOW > THINK > FYI > IGNORE）
-2. BuzzScore total_score（連続値、降順）
-3. 鮮度・Confidence
+LLM判定済みの記事をComposite Scoreで統合的にソートし、最大15件に絞り込む：
+
+**Composite Score方式**:
+```
+composite = 0.4 × LABEL_SCORE[label] + 0.6 × normalized_external_buzz
+
+LABEL_SCORE:
+- ACT_NOW: 100
+- THINK: 60
+- FYI: 20
+- IGNORE: 0
+```
+
+**ソート順**:
+1. Composite Score降順
+2. 鮮度（judged_at降順）
+3. Confidence降順
 
 **選定ルール**:
 - IGNOREは除外
-- ACT_NOW、THINK、FYIから最大15件
-- 同一ドメインは最大4件まで
+- Composite Score順で上位15件を選定
+- ドメイン偏り制御（max_per_domain > 0のとき適用）
 
 **関連用語**:
-- [候補選定](#候補選定): LLM判定前の選定（最大150件）
+- [候補選定](#候補選定): LLM判定前の選定（最大100件）
 - [出力最小主義](#出力最小主義): 最大15件の根拠
+- [Composite Score](#composite-score): 最終選定のランキングスコア
 
 **使用例**:
 - 「最終選定により、通知件数を15件以内に制限する」
-- 「最終選定では、ACT_NOWラベルの記事を優先する」
+- 「最終選定では、Composite Score降順で記事をソートする」
 
 **実装箇所**: `src/services/final_selector.py`
 
 **英語表記**: Final Selection
+
+### Composite Score
+
+**定義**: InterestLabelと外部話題性を重み付き混合した統合スコア（0-100）
+
+**説明**:
+FinalSelectorで使用される記事の最終的なランキングスコア。LLMが判定したInterestLabelのスコア化値と、BuzzScoreからinterest成分を除外した外部話題性（external_buzz）を組み合わせて算出する。
+
+**計算式**:
+```
+composite = α × LABEL_SCORE[label] + (1-α) × normalized_external_buzz
+
+where:
+  α = 0.4（InterestLabel側の重み）
+  LABEL_SCORE = {ACT_NOW: 100, THINK: 60, FYI: 20, IGNORE: 0}
+  normalized_external_buzz = BuzzScore.external_buzz（0-100）
+```
+
+**関連用語**:
+- [Interest Label](#interest-label): Composite Scoreの構成要素（40%）
+- [Buzzスコア](#buzzスコア): external_buzzがComposite Scoreの構成要素（60%）
+- [最終選定](#最終選定): Composite Scoreでソートして選定
+
+**使用例**:
+- 「Composite Score降順で記事をソートし、上位15件を選定する」
+- 「ACT_NOW + 高いexternal_buzzの記事はComposite Scoreが最も高くなる」
+
+**実装箇所**: `src/services/final_selector.py` の `_calculate_composite_score()`
+
+**英語表記**: Composite Score
 
 ---
 
@@ -773,7 +810,7 @@ models/ (データモデル)
 **Phase 1（MVP）**:
 - 単一Lambda構成
 - 処理時間: 10分以内（目標）
-- LLM判定対象: 最大150件
+- LLM判定対象: 最大100件
 
 **Phase 2（将来）**:
 - Step Functions構成（3つのLambda）
@@ -783,7 +820,7 @@ models/ (データモデル)
 **移行トリガー**:
 - 実行時間が12分を超える
 - 収集元が大幅に増える
-- LLM判定対象を150件以上に拡大
+- LLM判定対象を100件以上に拡大
 
 **関連ドキュメント**:
 - [アーキテクチャ設計書](./architecture.md#Phase-1--Phase-2)
@@ -831,7 +868,9 @@ class Article:
 - `interest_label`: 関心度ラベル（ACT_NOW/THINK/FYI/IGNORE）
 - `buzz_label`: 話題性ラベル（HIGH/MID/LOW）
 - `confidence`: 信頼度（0.0-1.0）
-- `reason`: 判定理由（最大200文字）
+- `summary`: LLM生成の要約（最大300文字、メール表示用）
+- `tags`: 記事タグ（例: ["Kotlin", "Claude"]）
+- `published_at`: 記事の公開日時（UTC）
 - `model_id`: 使用したモデルID
 - `judged_at`: 判定日時（UTC）
 
@@ -843,7 +882,9 @@ class JudgmentResult:
     interest_label: Literal["ACT_NOW", "THINK", "FYI", "IGNORE"]
     buzz_label: Literal["HIGH", "MID", "LOW"]
     confidence: float
-    reason: str
+    summary: str
+    tags: list[str]
+    published_at: datetime
     model_id: str
     judged_at: datetime
 ```
@@ -964,37 +1005,28 @@ LLM判定時にエラーが発生した場合。
 
 **計算式**:
 ```
-total_score = (source_count_score * 0.4) + (recency_score * 0.5) + (domain_diversity_score * 0.1)
+total_score = (social_proof × 0.55) + (interest × 0.35) + (authority × 0.10)
 
 where:
-  # ソース数スコア（40%）
-  source_count_score = min(source_count * 20, 100)
-  # 5ソース以上で100点
+  # SocialProof 4指標統合スコア（55%）
+  social_proof_score = yamadashy × 0.05 + hatena × 0.45 + zenn × 0.35 + qiita × 0.15
 
-  # 鮮度スコア（50%）
-  recency_score = 100 * max(0, 1 - (days_elapsed / 10))
-  # 10日で0点
+  # Interest 5段階マッチングスコア（35%）
+  interest_score = max: 100, high: 80, medium: 55, low: 30, ignore: 0, デフォルト: 15
 
-  # ドメイン多様性スコア（10%）
-  domain_diversity_score = (unique_domains / total_sources) * 100
-  # 全て異なるドメインで100点
+  # Authority スコア（10%）
+  authority_score = OFFICIAL: 100, HIGH: 80, MEDIUM: 50, LOW/未設定: 0
 ```
 
 **実装箇所**: `src/services/buzz_scorer.py`
 
 **例**:
-```python
-# 例1: 3ソース、2日前、3ドメイン全て異なる
-source_count_score = min(3 * 20, 100) = 60
-recency_score = 100 * max(0, 1 - (2 / 10)) = 80
-domain_diversity_score = (3 / 3) * 100 = 100
-total_score = (60 * 0.4) + (80 * 0.5) + (100 * 0.1) = 74
+```
+# 例1: social_proof=60, interest=80（high_interest一致）, authority=50（MEDIUM）
+total_score = (60 × 0.55) + (80 × 0.35) + (50 × 0.10) = 33 + 28 + 5 = 66
 
-# 例2: 1ソース、本日、1ドメイン
-source_count_score = min(1 * 20, 100) = 20
-recency_score = 100 * max(0, 1 - (0 / 10)) = 100
-domain_diversity_score = (1 / 1) * 100 = 100
-total_score = (20 * 0.4) + (100 * 0.5) + (100 * 0.1) = 68
+# 例2: social_proof=90, interest=100（max_interest一致）, authority=100（OFFICIAL）
+total_score = (90 × 0.55) + (100 × 0.35) + (100 × 0.10) = 49.5 + 35 + 10 = 94.5
 ```
 
 **関連用語**:
@@ -1053,6 +1085,7 @@ total_score = (20 * 0.4) + (100 * 0.5) + (100 * 0.1) = 68
 ### A-Z
 - [Article](#article) - データモデル用語
 - [AWS Lambda](#aws-lambda) - 技術用語
+- [Composite Score](#composite-score) - ドメイン用語
 - [ExecutionSummary](#executionsummary) - データモデル用語
 - [Interest Label](#interest-label) - ドメイン用語
 - [JudgmentResult](#judgmentresult) - データモデル用語
@@ -1068,4 +1101,5 @@ total_score = (20 * 0.4) + (100 * 0.5) + (100 * 0.1) = 68
 
 | 日付 | 変更内容 | 更新者 |
 |------|---------|--------|
+| 2026-02-18 | BuzzScore計算体系を3要素に更新、Composite Score方式追加、LLM出力フォーマット更新（summary/tags）、候補数150→100 | システム |
 | 2025-01-15 | 初版作成 | システム |

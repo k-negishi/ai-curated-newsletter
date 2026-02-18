@@ -146,13 +146,15 @@ class JudgmentResult:
     Attributes:
         url: 記事URL（キャッシュキー）
         title: 記事タイトル
-        description: 記事の概要（最大800文字）
+        description: 記事の概要（最大800文字、RSS/Atomから取得、LLMプロンプトの入力として使用）
         interest_label: 関心度ラベル
         buzz_label: 話題性ラベル
         confidence: 信頼度（0.0-1.0）
-        reason: 判定理由（短文）
+        summary: LLM生成の要約（最大300文字、メール表示用）
         model_id: 使用したLLMモデルID
         judged_at: 判定日時（UTC）
+        published_at: 記事の公開日時（UTC）
+        tags: 記事タグ（例: ["Kotlin", "Claude"]）
     """
     url: str                    # 記事URL
     title: str                  # 記事タイトル
@@ -160,9 +162,11 @@ class JudgmentResult:
     interest_label: InterestLabel  # ACT_NOW | THINK | FYI | IGNORE
     buzz_label: BuzzLabel       # HIGH | MID | LOW
     confidence: float           # 0.0-1.0
-    reason: str                 # 判定理由（最大200文字）
+    summary: str                # LLM生成の要約（最大300文字）
     model_id: str               # 例: "claude-haiku-4-5-20251001"
     judged_at: datetime         # 判定日時（UTC）
+    published_at: datetime      # 記事の公開日時（UTC）
+    tags: list[str] = field(default_factory=list)  # 記事タグ（1-5個）
 ```
 
 **制約**:
@@ -172,7 +176,9 @@ class JudgmentResult:
 - `interest_label`: 4つの値のみ許可
 - `buzz_label`: 3つの値のみ許可
 - `confidence`: 0.0-1.0の範囲
-- `reason`: 最大200文字
+- `summary`: 最大300文字
+- `tags`: list[str]（1-5個）
+- `published_at`: datetime（UTC）
 
 ### エンティティ: InterestProfile（関心プロファイル）
 
@@ -194,25 +200,29 @@ class JudgmentCriterion:
 
 @dataclass
 class InterestProfile:
-    """関心プロファイル.
+    """関心プロファイル（5段階版）.
 
     Attributes:
         summary: プロファイルの概要
+        max_interest: 最高関心を持つトピックのリスト
         high_interest: 高い関心を持つトピックのリスト
         medium_interest: 中程度の関心を持つトピックのリスト
-        low_priority: 低優先度のトピックのリスト
+        low_interest: 低関心のトピックのリスト
+        ignore_interest: 関心外のトピックのリスト
         criteria: 判定基準の辞書（キー: act_now/think/fyi/ignore）
     """
     summary: str
+    max_interest: list[str]
     high_interest: list[str]
     medium_interest: list[str]
-    low_priority: list[str]
+    low_interest: list[str]
+    ignore_interest: list[str]
     criteria: dict[str, JudgmentCriterion]
 ```
 
 **制約**:
 - `summary`: 必須、プロファイルの概要説明
-- `high_interest`, `medium_interest`, `low_priority`: 空リスト可
+- `max_interest`, `high_interest`, `medium_interest`, `low_interest`, `ignore_interest`: 空リスト可
 - `criteria`: act_now, think, fyi, ignoreの4つのキーを持つ
 
 **利用方法**:
@@ -227,36 +237,29 @@ from dataclasses import dataclass
 
 @dataclass
 class BuzzScore:
-    """話題性スコア（非LLM計算、5要素統合版）.
+    """話題性スコア（非LLM計算、3要素版）.
 
     Attributes:
         url: 記事URL
-        recency_score: 鮮度スコア（0-100）
-        consensus_score: 複数ソース出現スコア（0-100）
         social_proof_score: 外部反応スコア（0-100）
         interest_score: 興味との一致度スコア（0-100）
         authority_score: 公式補正スコア（0-100）
-        source_count: 複数ソース出現回数（メタデータ）
-        social_proof_count: 外部反応数（はてブ数、メタデータ）
+        social_proof_count: 外部反応数（メタデータ）
         total_score: 総合Buzzスコア（0-100）
     """
     url: str                       # 記事URL
     # 各要素スコア（0-100）
-    recency_score: float           # 鮮度スコア
-    consensus_score: float         # 複数ソース出現スコア
-    social_proof_score: float      # 外部反応スコア（はてブ数など）
+    social_proof_score: float      # 外部反応スコア（4指標統合）
     interest_score: float          # 興味との一致度スコア
     authority_score: float         # 公式補正スコア
     # メタデータ
-    source_count: int              # 複数ソース出現回数（1以上）
-    social_proof_count: int        # 外部反応数（はてブ数）
+    social_proof_count: int        # 外部反応数
     # 総合スコア
     total_score: float             # 総合Buzzスコア（0-100）
 ```
 
 **制約**:
-- `source_count`: 1以上
-- 各スコア（`recency_score`, `consensus_score`, `social_proof_score`, `interest_score`, `authority_score`, `total_score`）: 0-100の範囲
+- 各スコア（`social_proof_score`, `interest_score`, `authority_score`, `total_score`）: 0-100の範囲
 - `social_proof_count`: 0以上
 
 **BuzzLabel変換メソッド**:
@@ -265,6 +268,9 @@ def to_buzz_label(self) -> BuzzLabel:
     """total_scoreから閾値でBuzzLabelを導出する."""
     # HIGH ≥ 70, MID ≥ 40, LOW < 40
 ```
+
+**external_buzzプロパティ**:
+interest成分を除外した外部話題性スコア（0-100正規化）。FinalSelectorのComposite Score計算で使用。
 
 ### エンティティ: ExecutionSummary（実行サマリ）
 
@@ -367,16 +373,19 @@ erDiagram
         string interest_label
         string buzz_label
         float confidence
-        string reason
+        string summary
         string model_id
         datetime judged_at
+        datetime published_at
+        list tags
     }
 
     BUZZ_SCORE {
         string url PK
-        int source_count
-        float recency_score
-        float domain_diversity_score
+        float social_proof_score
+        float interest_score
+        float authority_score
+        int social_proof_count
         float total_score
     }
 
@@ -596,22 +605,19 @@ class Deduplicator:
 ### BuzzScorer（話題性スコア計算器）
 
 **責務**:
-- 5要素のスコア計算（Recency、Consensus、SocialProof、Interest、Authority）
+- 3要素のスコア計算（SocialProof、Interest、Authority）
 - 重み付け合算による総合Buzzスコア算出
-- はてなブックマーク数の取得（SocialProof）
+- 複数ソースからのSocialProof取得（4指標統合）
 - InterestProfileとの一致度判定
 
-**5要素の詳細**:
-1. **Recency（鮮度）**: 公開からの経過日数（重み: 25%）
-2. **Consensus（複数ソース出現）**: 同一URLの出現回数（重み: 20%）
-3. **SocialProof（外部反応）**: はてなブックマーク数（重み: 20%）
-4. **Interest（興味との一致度）**: InterestProfileとのマッチング（重み: 25%）
-5. **Authority（公式補正）**: 公式ブログ・一次情報源への加点（重み: 10%）
+**3要素の詳細**:
+1. **SocialProof（外部反応）**: 4指標統合スコア（yamadashy 5%, Hatena 45%, Zenn 35%, Qiita 15%）（重み: 55%）
+2. **Interest（興味との一致度）**: InterestProfileとの5段階マッチング（重み: 35%）
+3. **Authority（公式補正）**: authority_levelに応じたスコア（0, 50, 80, 100）（重み: 10%）
 
 **スコア計算式**:
 ```
-total_score = (recency × 0.25) + (consensus × 0.20) + (social_proof × 0.20)
-            + (interest × 0.25) + (authority × 0.10)
+total_score = (social_proof × 0.55) + (interest × 0.35) + (authority × 0.10)
 ```
 
 **インターフェース**:
@@ -619,20 +625,20 @@ total_score = (recency × 0.25) + (consensus × 0.20) + (social_proof × 0.20)
 from typing import List, Dict
 
 class BuzzScorer:
-    """話題性スコア計算（5要素統合版、非LLM）."""
+    """話題性スコア計算（3要素統合版、非LLM）."""
 
     def __init__(
         self,
         interest_profile: InterestProfile,
         source_master: SourceMaster,
-        social_proof_fetcher: SocialProofFetcher,
+        social_proof_fetcher: MultiSourceSocialProofFetcher,
     ) -> None:
         """Buzzスコア計算サービスを初期化する.
 
         Args:
             interest_profile: 興味プロファイル
             source_master: 収集元マスタ
-            social_proof_fetcher: SocialProof取得サービス
+            social_proof_fetcher: マルチソースSocialProof取得サービス
         """
         ...
 
@@ -651,14 +657,13 @@ class BuzzScorer:
 **依存関係**:
 - InterestProfile（Interest要素）
 - SourceMaster（Authority要素）
-- SocialProofFetcher（SocialProof要素）
-- httpx（はてブAPI呼び出し）
+- MultiSourceSocialProofFetcher（SocialProof要素、4指標統合）
 
 ### CandidateSelector（候補選定器）
 
 **責務**:
 - Buzzスコアと鮮度でソート
-- 上位最大150件（推奨120件）を選定
+- 上位最大100件を選定
 - キャッシュヒット済みURLの除外
 
 **インターフェース**:
@@ -674,11 +679,11 @@ class SelectionResult:
 class CandidateSelector:
     """LLM判定候補の選定."""
 
-    def __init__(self, max_candidates: int = 150) -> None:
+    def __init__(self, max_candidates: int = 100) -> None:
         """候補選定器を初期化する.
 
         Args:
-            max_candidates: 最大候補数（デフォルト: 150）
+            max_candidates: 最大候補数（デフォルト: 100）
         """
         ...
 
@@ -777,10 +782,26 @@ class LlmJudge:
 ### FinalSelector（最終選定器）
 
 **責務**:
-- Interest Labelによる優先順位付け（ACT_NOW > THINK > FYI > IGNORE）
-- 同一ラベル内でのソート（BuzzScore total_score連続値、鮮度、Confidence）
+- Composite Score（InterestLabel + 外部話題性の重み付き混合）による統合的なソート
+- ドメイン偏り制御（同一ドメイン最大件数）
 - 最大15件の選定
-- ドメイン偏り制御（同一ドメイン最大件数、デフォルト: 制限なし）
+
+**Composite Score計算式**:
+```
+composite = α × LABEL_SCORE[label] + (1-α) × normalized_external_buzz
+α = 0.4（InterestLabel側の重み）
+
+LABEL_SCORE:
+- ACT_NOW: 100
+- THINK: 60
+- FYI: 20
+- IGNORE: 0
+
+ソート順:
+1. Composite Score降順
+2. 鮮度（judged_at降順）
+3. Confidence降順
+```
 
 **インターフェース**:
 ```python
@@ -988,9 +1009,11 @@ Attributes:
 - interest_label (string)
 - buzz_label (string)
 - confidence (number)
-- reason (string)
+- summary (string)
 - model_id (string)
 - judged_at (string, ISO8601)
+- tags (list)
+- published_at (string, ISO8601)
 ```
 
 **注意**: 既存のキャッシュデータには`title`と`description`が含まれていない可能性があるため、CacheRepository.getメソッドで`item.get("title", "No Title")`と`item.get("description", "")`を使用してデフォルト値を設定する。
@@ -1164,7 +1187,7 @@ sequenceDiagram
     Buzz-->>Orch: Buzzスコア辞書
 
     Orch->>Cand: select(articles, buzz_scores)
-    Cand-->>Orch: 上位120-150件
+    Cand-->>Orch: 上位最大100件
 
     Orch->>Judge: judge_batch(inputs)
     loop 並列判定（5件ずつ）
@@ -1194,7 +1217,7 @@ sequenceDiagram
 4. Normalizerが記事情報を正規化
 5. DeduplicatorがURL重複とキャッシュヒットを排除（200-400件）
 6. BuzzScorerが話題性スコアを計算（非LLM）
-7. CandidateSelectorが上位120-150件を選定
+7. CandidateSelectorが上位最大100件を選定
 8. LlmJudgeが並列判定（5件ずつ）し、結果をキャッシュ保存
 9. FinalSelectorが最大15件に厳選
 10. Formatterがメール本文を生成
@@ -1242,109 +1265,82 @@ sequenceDiagram
 
 **目的**: 記事の話題性を非LLMロジックで定量化し、LLM判定対象の優先順位付けに使用
 
-**計算ロジック**:
+**計算ロジック（3要素 + SocialProof 4指標統合）**:
 
-#### ステップ1: 複数ソース出現スコア計算
-- 複数のフィードで同一URLが出現した場合、話題性が高いと判断
-- 計算式: `source_count_score = min(source_count * 20, 100)`
+#### ステップ1: SocialProof 4指標統合スコア計算
+- 4つのソースからの外部反応を重み付き統合（各指標0-100に正規化）
+- yamadashy: 5%
+- Hatena: 45%
+- Zenn: 35%
+- Qiita: 15%
+- 計算式: `social_proof = yamadashy × 0.05 + hatena × 0.45 + zenn × 0.35 + qiita × 0.15`
 - スコア範囲: 0-100点
-- 例:
-  - 1ソース: 20点
-  - 3ソース: 60点
-  - 5ソース以上: 100点
 
-#### ステップ2: 鮮度スコア計算
-- 公開からの経過日数が少ないほど高スコア
-- 計算式: `recency_score = max(100 - (days_old * 10), 0)`
+#### ステップ2: Interest（5段階マッチング）スコア計算
+- InterestProfileの5段階とのマッチングでスコアを決定
+- max: 100, high: 80, medium: 55, low: 30, ignore: 0, デフォルト: 15
 - スコア範囲: 0-100点
-- 例:
-  - 0日（本日公開）: 100点
-  - 3日前: 70点
-  - 7日前: 30点
-  - 10日以上前: 0点
 
-**実装例**:
-```python
-from datetime import datetime, timezone
-
-def calculate_recency_score(published_at: datetime) -> float:
-    """鮮度スコアを計算する.
-
-    Args:
-        published_at: 公開日時（UTC）
-
-    Returns:
-        鮮度スコア (0-100点)
-    """
-    now = datetime.now(timezone.utc)
-    days_old = (now - published_at).days
-    return max(100 - (days_old * 10), 0)
-```
-
-#### ステップ3: ドメイン多様性スコア計算
-- 同一ドメインの記事が多すぎる場合、スコアを減点
-- 全記事中の同一ドメイン記事数でペナルティ
-- 計算式: `domain_diversity_score = 100 - (same_domain_count * 5)`
+#### ステップ3: Authority スコア計算
+- authority_levelに応じたスコアを付与
+- OFFICIAL: 100, HIGH: 80, MEDIUM: 50, LOW/未設定: 0
 - スコア範囲: 0-100点
-- 例:
-  - 同一ドメイン1件: 95点
-  - 同一ドメイン5件: 75点
-  - 同一ドメイン20件以上: 0点
 
 #### ステップ4: 総合スコア計算
-- 加重平均: `total_score = (source_count_score × 40%) + (recency_score × 50%) + (domain_diversity_score × 10%)`
+- 加重平均: `total_score = (social_proof × 0.55) + (interest × 0.35) + (authority × 0.10)`
 - 重み配分:
-  - 複数ソース出現: 40%（最重要）
-  - 鮮度: 50%（最重要）
-  - ドメイン多様性: 10%（補正）
+  - SocialProof: 55%（最重要）
+  - Interest: 35%
+  - Authority: 10%（補正）
 
 **実装例**:
 ```python
-def calculate_total_buzz_score(
-    source_count: int,
-    published_at: datetime,
-    same_domain_count: int
+def calculate_buzz_score(
+    social_proof_score: float,
+    interest_score: float,
+    authority_score: float,
 ) -> float:
     """総合Buzzスコアを計算する.
 
     Args:
-        source_count: 複数ソース出現回数
-        published_at: 公開日時
-        same_domain_count: 同一ドメイン記事数
+        social_proof_score: SocialProof 4指標統合スコア（0-100）
+        interest_score: Interest 5段階マッチングスコア（0-100）
+        authority_score: Authority スコア（0-100）
 
     Returns:
         総合Buzzスコア (0-100点)
     """
-    source_score = min(source_count * 20, 100)
-    recency_score = calculate_recency_score(published_at)
-    diversity_score = max(100 - (same_domain_count * 5), 0)
-
-    return (source_score * 0.4) + (recency_score * 0.5) + (diversity_score * 0.1)
+    return (social_proof_score * 0.55) + (interest_score * 0.35) + (authority_score * 0.10)
 ```
 
 ### 最終選定アルゴリズム
 
 **目的**: LLM判定結果から最大15件を厳選
 
-**選定ロジック**:
+**選定ロジック（Composite Score方式）**:
 
-#### ステップ1: Interest Labelによる優先順位付け
-```
-優先度: ACT_NOW > THINK > FYI > IGNORE
-```
-- IGNOREは選定対象外
+#### ステップ1: IGNORE除外
+- interest_labelがIGNOREの記事は選定対象外
 
-#### ステップ2: 同一ラベル内でのソート
+#### ステップ2: Composite Scoreでソート
 ```
+composite = 0.4 × LABEL_SCORE[label] + 0.6 × normalized_external_buzz
+
+LABEL_SCORE:
+- ACT_NOW: 100
+- THINK: 60
+- FYI: 20
+- IGNORE: 0
+
 ソート順:
-1. BuzzScore total_score（連続値、降順）
-2. 鮮度（published_at降順）
-3. Confidence（降順）
+1. Composite Score降順
+2. 鮮度（judged_at降順）
+3. Confidence降順
 ```
 
 #### ステップ3: ドメイン偏り制御
-- 同一ドメインは最大4件まで
-- 5件目以降は次のドメインの記事を選定
+- max_per_domain > 0のとき、同一ドメインの記事数を制限
+- 制限を超えた記事は次のドメインの記事を選定
 
 #### ステップ4: 最大15件選定
 - 上記ルールで上位15件を選定
@@ -1355,9 +1351,12 @@ def calculate_total_buzz_score(
 from typing import List, Dict
 from urllib.parse import urlparse
 
+LABEL_SCORE = {"ACT_NOW": 100, "THINK": 60, "FYI": 20, "IGNORE": 0}
+
 def select_final_articles(
     articles: List[Article],
     judgments: Dict[str, JudgmentResult],
+    buzz_scores: Dict[str, BuzzScore],
     max_articles: int = 15,
     max_per_domain: int = 0
 ) -> List[Article]:
@@ -1366,6 +1365,7 @@ def select_final_articles(
     Args:
         articles: 記事リスト
         judgments: 判定結果辞書
+        buzz_scores: Buzzスコア辞書
         max_articles: 最大記事数
         max_per_domain: 同一ドメイン最大数（0=制限なし）
 
@@ -1379,14 +1379,17 @@ def select_final_articles(
         if article.url in judgments and judgments[article.url].interest_label != "IGNORE"
     ]
 
-    # Interest Label順、BuzzScore順、鮮度順、Confidence順でソート
-    interest_priority = {"ACT_NOW": 4, "THINK": 3, "FYI": 2, "IGNORE": 1}
+    # Composite Scoreでソート
+    def composite_score(article, judgment):
+        label_score = LABEL_SCORE.get(judgment.interest_label, 0)
+        buzz = buzz_scores.get(article.url)
+        external_buzz = buzz.external_buzz if buzz else 0.0
+        return 0.4 * label_score + 0.6 * external_buzz
 
     candidates.sort(
         key=lambda x: (
-            -interest_priority[x[1].interest_label],
-            -(buzz_scores or {}).get(x[0].url, ZERO_BUZZ_SCORE).total_score,
-            -x[0].published_at.timestamp(),
+            -composite_score(x[0], x[1]),
+            -x[1].judged_at.timestamp(),
             -x[1].confidence
         )
     )
@@ -1402,7 +1405,7 @@ def select_final_articles(
         domain = urlparse(article.url).netloc
         current_count = domain_counts.get(domain, 0)
 
-        if current_count < max_per_domain:
+        if max_per_domain <= 0 or current_count < max_per_domain:
             selected.append(article)
             domain_counts[domain] = current_count + 1
 
