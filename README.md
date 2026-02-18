@@ -1,5 +1,7 @@
 # AI Curated Newsletter
 
+[![Coverage](https://codecov.io/gh/k-negishi/ai-curated-newsletter/graph/badge.svg)](https://codecov.io/gh/k-negishi/ai-curated-newsletter)
+
 技術ニュース/テックブログを収集し、LLM で判定して「読む価値のある記事」を厳選してメール通知する AWS Lambda ベースのシステムです。
 
 ## Claude Code による仕様駆動開発(SDD)
