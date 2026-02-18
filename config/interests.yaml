@@ -13,32 +13,31 @@ profile:
 
   # 高い関心を持つトピック（ACT_NOW / THINK に該当しやすい）
   high_interest:
-    - AI Coding（Claude、ChatGPT、OpenAI Codex、プロンプトエンジニアリング）
     - スケーラビリティ（分散システム、パフォーマンス最適化）
     - データベース設計（PostgreSQL、実行計画、インデックス）
+    - AI Coding（Claude、ChatGPT、OpenAI Codex、プロンプトエンジニアリング）
 
   # 中程度の関心を持つトピック（FYI に該当しやすい）
   medium_interest:
-    - API設計（REST、設計原則、ベストプラクティス）
     - バックエンド技術（Kotlin、Ktor）
     - フロントエンド技術（TypeScript、Vue.js）
     - テスト設計（自動化、品質保証、テスト戦略）
     - CI改善（CI/CD、デプロイ自動化、開発生産性、GitHub Actions）
-    - AWS（Lambda、Step Functions、EventBridge、ECS、Aurora、CloudWatch）
     - バッチ処理設計（非同期処理、ジョブ管理）
     - エンジニアリングキャリア（フルサイクルエンジニア、スタッフエンジニア、シニアエンジニア、テックリード、アーキテクト）
     - BigQuery
 
   # 低関心のトピック（優先度低）
   low_interest:
+    - AWS（Lambda、Step Functions、EventBridge、ECS、Aurora、CloudWatch）
+    - API設計（REST、設計原則、ベストプラクティス）
     - クラウド技術の最新動向
     - セキュリティ
     - 特定の言語・フレームワークの基礎文法
     - プロダクト発表のみで技術的詳細がない記事
     - 可観測性（ログ、メトリクス、トレーシング、モニタリング）
-    - Next.js
 
-  # 関心外のトピック（スコア0、通知しない）
+  # 関心外のトピック（スコア0）
   ignore_interest:
     - 初心者向けチュートリアル
     - ニュース速報のみで深い考察がない記事
@@ -52,6 +51,9 @@ profile:
     - 6G
     - RAG
     - Rails
+    - Cloudflare
+    - Cloudflare Pages
+    - GitLab
 
 # 判定基準の定義
 criteria:
