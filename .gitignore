@@ -12,3 +12,4 @@
 
 # Claude Code - 共通リポジトリの.gitignoreは除外
 .claude-shared/.gitignore
+/.claude.backup/
