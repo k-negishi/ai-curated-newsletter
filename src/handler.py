@@ -6,6 +6,7 @@ import uuid
 from typing import Any
 
 import boto3
+from botocore.config import Config
 
 from src.orchestrator.orchestrator import Orchestrator
 from src.repositories.interest_master import InterestMaster
@@ -49,7 +50,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     try:
         # 設定読み込み
         config = load_config()
-        logger.info("config_loaded", environment=config.environment)
+        logger.debug("config_loaded", environment=config.environment)
 
         # ログレベル設定（config から取得）
         configure_logging(log_level=config.log_level, run_id=run_id)
@@ -57,7 +58,7 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         # イベント解析と dry_run フラグ決定
         # イベント内の dry_run フラグが設定されていれば優先、なければ環境変数から取得
         dry_run = event.get("dry_run", config.dry_run)
-        logger.info("event_parsed", dry_run=dry_run)
+        logger.debug("event_parsed", dry_run=dry_run)
 
         # AWS クライアント初期化
         # TODO(MVP): DynamoDB未セットアップのため一時的にコメントアウト
@@ -65,7 +66,16 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         # dynamodb = boto3.resource("dynamodb")
         # cache_repository = CacheRepository(dynamodb, config.dynamodb_cache_table)
         # history_repository = HistoryRepository(dynamodb, config.dynamodb_history_table)
-        bedrock_runtime = boto3.client("bedrock-runtime", region_name=config.bedrock_region)
+        # boto3のデフォルト内部リトライ（max_attempts=5）を無効化し、
+        # LlmJudgeのカスタムリトライ（指数バックオフ+ジッター）に一本化する
+        bedrock_config = Config(
+            retries={"max_attempts": 0, "mode": "standard"},
+        )
+        bedrock_runtime = boto3.client(
+            "bedrock-runtime",
+            region_name=config.bedrock_region,
+            config=bedrock_config,
+        )
         ses = boto3.client("ses")
 
         # リポジトリ初期化

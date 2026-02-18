@@ -62,10 +62,12 @@ class TestMultiSourceSocialProofFetcher:
 
             result = await fetcher.fetch_batch(articles)
 
-        # 統合スコア: S = (0.05*100 + 0.45*50 + 0.35*60 + 0.15*70) / 1.0
-        # S = (5 + 22.5 + 21 + 10.5) / 1.0 = 59.0
+        # example.com = 外部ブログ → H+Y のみ適用（Z, Q は除外）
+        # weighted_sum = 0.05*100 + 0.45*50 = 5 + 22.5 = 27.5
+        # applicable_weight = 0.05 + 0.45 = 0.50
+        # score = 27.5 / 0.50 = 55.0
         assert len(result) == 1
-        assert 58.5 <= result["https://example.com/article1"] <= 59.5
+        assert 54.5 <= result["https://example.com/article1"] <= 55.5
 
     @pytest.mark.asyncio
     async def test_fetch_batch_one_signal_missing(self):
@@ -103,10 +105,12 @@ class TestMultiSourceSocialProofFetcher:
 
             result = await fetcher.fetch_batch(articles)
 
-        # 統合スコア（Zenn=0も含める）: S = (0.05*100 + 0.45*50 + 0.35*0 + 0.15*70) / 1.0
-        # S = (5 + 22.5 + 0 + 10.5) / 1.0 = 38.0
+        # example.com = 外部ブログ → H+Y のみ適用（Z, Q は除外）
+        # weighted_sum = 0.05*100 + 0.45*50 = 5 + 22.5 = 27.5
+        # applicable_weight = 0.05 + 0.45 = 0.50
+        # score = 27.5 / 0.50 = 55.0
         assert len(result) == 1
-        assert 37.5 <= result["https://example.com/article1"] <= 38.5
+        assert 54.5 <= result["https://example.com/article1"] <= 55.5
 
     @pytest.mark.asyncio
     async def test_fetch_batch_all_signals_zero(self):
@@ -143,7 +147,9 @@ class TestMultiSourceSocialProofFetcher:
 
             result = await fetcher.fetch_batch(articles)
 
-        # 統合スコア: S = (0.05*0 + 0.45*0 + 0.35*0 + 0.15*0) / 1.0 = 0.0
+        # example.com = 外部ブログ → H+Y のみ適用
+        # weighted_sum = 0.05*0 + 0.45*0 = 0
+        # score = 0 / 0.50 = 0.0
         assert len(result) == 1
         assert result["https://example.com/article1"] == 0.0
 
@@ -182,7 +188,9 @@ class TestMultiSourceSocialProofFetcher:
 
             result = await fetcher.fetch_batch(articles)
 
-        # 全て100点の場合、統合スコアも100点
+        # example.com = 外部ブログ → H+Y のみ適用
+        # weighted_sum = 0.05*100 + 0.45*100 = 50
+        # score = 50 / 0.50 = 100.0
         assert result["https://example.com/article1"] == 100.0
 
     @pytest.mark.asyncio
@@ -235,6 +243,114 @@ class TestMultiSourceSocialProofFetcher:
 
             result = await fetcher.fetch_batch(articles)
 
-        # 修正後の期待値: S = (0.05*0 + 0.45*0 + 0.35*0 + 0.15*50) / 1.0 = 7.5
+        # qiita.com → H+Q+Y 適用（Z は除外）
+        # weighted_sum = 0.05*0 + 0.45*0 + 0.15*50 = 7.5
+        # applicable_weight = 0.05 + 0.45 + 0.15 = 0.65
+        # score = 7.5 / 0.65 = 11.54
         assert len(result) == 1
-        assert 7.0 <= result["https://qiita.com/example"] <= 8.0
+        assert 11.0 <= result["https://qiita.com/example"] <= 12.0
+
+    @pytest.mark.asyncio
+    async def test_zenn_url_normalization(self):
+        """Zenn URLではH+Z+Yの重みで正規化されることを検証."""
+        fetcher = MultiSourceSocialProofFetcher()
+
+        url = "https://zenn.dev/user/articles/test"
+        articles = [create_test_article(url)]
+
+        # Y=0, H=50, Z=60, Q=0
+        mock_yamadashy = AsyncMock()
+        mock_yamadashy.fetch_signals = AsyncMock(return_value={url: 0})
+
+        mock_hatena = AsyncMock()
+        mock_hatena.fetch_batch = AsyncMock(return_value={url: 50.0})
+
+        mock_zenn = AsyncMock()
+        mock_zenn.fetch_batch = AsyncMock(return_value={url: 60.0})
+
+        mock_qiita = AsyncMock()
+        mock_qiita.fetch_batch = AsyncMock(return_value={url: 0.0})
+
+        with patch.object(fetcher, "_yamadashy_fetcher", mock_yamadashy), \
+             patch.object(fetcher, "_hatena_fetcher", mock_hatena), \
+             patch.object(fetcher, "_zenn_fetcher", mock_zenn), \
+             patch.object(fetcher, "_qiita_fetcher", mock_qiita):
+
+            result = await fetcher.fetch_batch(articles)
+
+        # zenn.dev → H+Z+Y 適用（Q は除外）
+        # weighted_sum = 0.05*0 + 0.45*50 + 0.35*60 = 0 + 22.5 + 21 = 43.5
+        # applicable_weight = 0.05 + 0.45 + 0.35 = 0.85
+        # score = 43.5 / 0.85 = 51.18
+        assert len(result) == 1
+        assert 50.5 <= result[url] <= 52.0
+
+    @pytest.mark.asyncio
+    async def test_qiita_url_normalization(self):
+        """Qiita URLではH+Q+Yの重みで正規化されることを検証."""
+        fetcher = MultiSourceSocialProofFetcher()
+
+        url = "https://qiita.com/user/items/test"
+        articles = [create_test_article(url)]
+
+        # Y=0, H=50, Z=0, Q=70
+        mock_yamadashy = AsyncMock()
+        mock_yamadashy.fetch_signals = AsyncMock(return_value={url: 0})
+
+        mock_hatena = AsyncMock()
+        mock_hatena.fetch_batch = AsyncMock(return_value={url: 50.0})
+
+        mock_zenn = AsyncMock()
+        mock_zenn.fetch_batch = AsyncMock(return_value={url: 0.0})
+
+        mock_qiita = AsyncMock()
+        mock_qiita.fetch_batch = AsyncMock(return_value={url: 70.0})
+
+        with patch.object(fetcher, "_yamadashy_fetcher", mock_yamadashy), \
+             patch.object(fetcher, "_hatena_fetcher", mock_hatena), \
+             patch.object(fetcher, "_zenn_fetcher", mock_zenn), \
+             patch.object(fetcher, "_qiita_fetcher", mock_qiita):
+
+            result = await fetcher.fetch_batch(articles)
+
+        # qiita.com → H+Q+Y 適用（Z は除外）
+        # weighted_sum = 0.05*0 + 0.45*50 + 0.15*70 = 0 + 22.5 + 10.5 = 33.0
+        # applicable_weight = 0.05 + 0.45 + 0.15 = 0.65
+        # score = 33.0 / 0.65 = 50.77
+        assert len(result) == 1
+        assert 50.0 <= result[url] <= 51.5
+
+    @pytest.mark.asyncio
+    async def test_external_url_normalization(self):
+        """外部URLではH+Yの重みで正規化されることを検証."""
+        fetcher = MultiSourceSocialProofFetcher()
+
+        url = "https://example.com/blog/post"
+        articles = [create_test_article(url)]
+
+        # Y=100, H=50, Z=0, Q=0
+        mock_yamadashy = AsyncMock()
+        mock_yamadashy.fetch_signals = AsyncMock(return_value={url: 100})
+
+        mock_hatena = AsyncMock()
+        mock_hatena.fetch_batch = AsyncMock(return_value={url: 50.0})
+
+        mock_zenn = AsyncMock()
+        mock_zenn.fetch_batch = AsyncMock(return_value={url: 0.0})
+
+        mock_qiita = AsyncMock()
+        mock_qiita.fetch_batch = AsyncMock(return_value={url: 0.0})
+
+        with patch.object(fetcher, "_yamadashy_fetcher", mock_yamadashy), \
+             patch.object(fetcher, "_hatena_fetcher", mock_hatena), \
+             patch.object(fetcher, "_zenn_fetcher", mock_zenn), \
+             patch.object(fetcher, "_qiita_fetcher", mock_qiita):
+
+            result = await fetcher.fetch_batch(articles)
+
+        # example.com = 外部ブログ → H+Y のみ適用
+        # weighted_sum = 0.05*100 + 0.45*50 = 5 + 22.5 = 27.5
+        # applicable_weight = 0.05 + 0.45 = 0.50
+        # score = 27.5 / 0.50 = 55.0
+        assert len(result) == 1
+        assert 54.5 <= result[url] <= 55.5

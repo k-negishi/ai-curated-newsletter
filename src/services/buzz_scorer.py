@@ -9,28 +9,24 @@ from src.services.social_proof.multi_source_social_proof_fetcher import (
     MultiSourceSocialProofFetcher,
 )
 from src.shared.logging.logger import get_logger
-from src.shared.utils.date_utils import now_utc
 
 logger = get_logger(__name__)
 
 
 class BuzzScorer:
-    """Buzzスコア計算サービス（4要素統合版）.
+    """Buzzスコア計算サービス（3要素版）.
 
     スコア計算式:
-    - recency_score = max(100 - (days_old * 10), 0)
     - social_proof_score = 4指標統合スコア（yamadashy, Hatena, Zenn, Qiita）（0-100）
     - interest_score = InterestProfileとのマッチング度（0-100）
     - authority_score = authority_levelに応じたスコア（0, 50, 80, 100）
-    - total_score = (social_proof × 0.45) + (interest × 0.35)
-                  + (recency × 0.15) + (authority × 0.05)
+    - total_score = (social_proof × 0.55) + (interest × 0.35) + (authority × 0.10)
     """
 
     # 重み配分（SNS反応を重視）
-    WEIGHT_SOCIAL_PROOF = 0.45
+    WEIGHT_SOCIAL_PROOF = 0.55
     WEIGHT_INTEREST = 0.35
-    WEIGHT_RECENCY = 0.15
-    WEIGHT_AUTHORITY = 0.05
+    WEIGHT_AUTHORITY = 0.10
 
     def __init__(
         self,
@@ -58,7 +54,7 @@ class BuzzScorer:
         Returns:
             スコア辞書（normalized_url -> BuzzScore）
         """
-        logger.info("buzz_scoring_start", article_count=len(articles))
+        logger.debug("buzz_scoring_start", article_count=len(articles))
 
         # SocialProof（4指標統合スコア）を一括取得
         social_proof_scores = await self._social_proof_fetcher.fetch_batch(articles)
@@ -67,13 +63,11 @@ class BuzzScorer:
         scores: dict[str, BuzzScore] = {}
 
         for article in articles:
-            recency_score = self._calculate_recency_score(article)
             social_proof_score = social_proof_scores.get(article.url, 20.0)  # デフォルト20.0
             interest_score = self._calculate_interest_score(article)
             authority_score = self._calculate_authority_score(article.source_name)
 
             total_score = self._calculate_total_score(
-                recency_score,
                 social_proof_score,
                 interest_score,
                 authority_score,
@@ -81,7 +75,6 @@ class BuzzScorer:
 
             buzz_score = BuzzScore(
                 url=article.url,
-                recency_score=recency_score,
                 social_proof_score=social_proof_score,
                 interest_score=interest_score,
                 authority_score=authority_score,
@@ -95,7 +88,6 @@ class BuzzScorer:
                 "buzz_score_calculated",
                 url=article.url,
                 total_score=total_score,
-                recency=recency_score,
                 social_proof=social_proof_score,
                 interest=interest_score,
                 authority=authority_score,
@@ -104,19 +96,6 @@ class BuzzScorer:
         logger.info("buzz_scoring_complete", score_count=len(scores))
 
         return scores
-
-    def _calculate_recency_score(self, article: Article) -> float:
-        """Recency（鮮度）スコアを計算する.
-
-        Args:
-            article: 記事
-
-        Returns:
-            スコア（0-100）
-        """
-        now = now_utc()
-        days_old = (now - article.published_at).days
-        return max(100.0 - (days_old * 10.0), 0.0)
 
     def _calculate_interest_score(self, article: Article) -> float:
         """Interest（興味との一致度）スコアを計算する（5段階版）.
@@ -202,7 +181,6 @@ class BuzzScorer:
 
     def _calculate_total_score(
         self,
-        recency: float,
         social_proof: float,
         interest: float,
         authority: float,
@@ -210,7 +188,6 @@ class BuzzScorer:
         """総合Buzzスコアを計算する（重み付け合算）.
 
         Args:
-            recency: 鮮度スコア
             social_proof: SocialProofスコア
             interest: Interestスコア
             authority: Authorityスコア
@@ -221,6 +198,5 @@ class BuzzScorer:
         return (
             (social_proof * self.WEIGHT_SOCIAL_PROOF)
             + (interest * self.WEIGHT_INTEREST)
-            + (recency * self.WEIGHT_RECENCY)
             + (authority * self.WEIGHT_AUTHORITY)
         )

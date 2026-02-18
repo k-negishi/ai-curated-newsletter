@@ -12,11 +12,10 @@ from src.models.judgment import BuzzLabel
 class BuzzScore:
     """話題性スコア（非LLM計算）.
 
-    記事の話題性を4つの要素から定量化したスコア.
+    記事の話題性を3つの要素から定量化したスコア.
 
     Attributes:
         url: 記事URL
-        recency_score: 鮮度スコア
         social_proof_score: 外部反応スコア（はてブ数など）
         interest_score: 興味との一致度スコア
         authority_score: 公式補正スコア
@@ -33,7 +32,6 @@ class BuzzScore:
 
     url: str
     # 各要素スコア
-    recency_score: float
     social_proof_score: float
     interest_score: float
     authority_score: float

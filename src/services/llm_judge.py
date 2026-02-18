@@ -3,6 +3,7 @@
 import asyncio
 import json
 import random
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -87,6 +88,8 @@ class LlmJudge:
         self._request_interval = request_interval
         self._retry_base_delay = retry_base_delay
         self._max_backoff = max_backoff
+        self._batch_input_tokens = 0
+        self._batch_output_tokens = 0
 
     async def judge_batch(self, articles: list[Article]) -> JudgmentBatchResult:
         """記事リストを一括判定する.
@@ -99,22 +102,50 @@ class LlmJudge:
         Returns:
             一括判定結果
         """
-        logger.info("llm_judgment_start", article_count=len(articles))
+        start_time = time.time()
+        logger.debug("llm_judgment_start", article_count=len(articles))
+
+        # バッチごとのトークン集計をリセット
+        self._batch_input_tokens = 0
+        self._batch_output_tokens = 0
 
         # 並列度制限（Semaphore）
         semaphore = asyncio.Semaphore(self._concurrency_limit)
 
-        async def judge_with_semaphore(article: Article) -> JudgmentResult | None:
+        async def judge_with_semaphore(index: int, article: Article) -> JudgmentResult | None:
+            # 初回バッチのみstaggered delay（セマフォ取得前に分散）
+            if index < self._concurrency_limit and self._request_interval > 0:
+                stagger_delay = index * (self._request_interval / self._concurrency_limit)
+                if stagger_delay > 0:
+                    await asyncio.sleep(stagger_delay)
             async with semaphore:
                 if self._request_interval > 0:
                     await asyncio.sleep(self._request_interval)
                 return await self._judge_single(article)
 
         # 並列実行
-        tasks = [judge_with_semaphore(article) for article in articles]
+        tasks = [judge_with_semaphore(i, article) for i, article in enumerate(articles)]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # 結果を集約
+        elapsed = time.time() - start_time
+        return self._aggregate_results(articles, results, elapsed)
+
+    def _aggregate_results(
+        self,
+        articles: list[Article],
+        results: list[JudgmentResult | BaseException | None],
+        elapsed: float,
+    ) -> JudgmentBatchResult:
+        """並列判定の結果を集約する.
+
+        Args:
+            articles: 判定対象記事のリスト
+            results: asyncio.gatherの結果リスト
+            elapsed: judge_batch全体の経過時間（秒）
+
+        Returns:
+            一括判定結果
+        """
         judgments: list[JudgmentResult] = []
         failed_count = 0
 
@@ -126,7 +157,6 @@ class LlmJudge:
                     error=str(result),
                 )
                 failed_count += 1
-                # 失敗時はIGNORE扱い
                 fallback_judgment = self._create_fallback_judgment(article)
                 judgments.append(fallback_judgment)
             elif result is None:
@@ -136,7 +166,6 @@ class LlmJudge:
                 judgments.append(fallback_judgment)
             elif isinstance(result, JudgmentResult):
                 judgments.append(result)
-                # キャッシュに保存
                 if self._cache_repository is not None:
                     try:
                         self._cache_repository.put(result)
@@ -156,6 +185,9 @@ class LlmJudge:
             total_count=len(articles),
             success_count=len(judgments) - failed_count,
             failed_count=failed_count,
+            total_input_tokens=self._batch_input_tokens,
+            total_output_tokens=self._batch_output_tokens,
+            elapsed_seconds=round(elapsed, 2),
         )
 
         return JudgmentBatchResult(judgments=judgments, failed_count=failed_count)
@@ -201,6 +233,19 @@ class LlmJudge:
                 # レスポンス解析
                 response_body = json.loads(response["body"].read())
                 content = response_body["content"][0]["text"]
+
+                # トークン数を抽出しDEBUGログ出力・バッチ集計用に蓄積
+                usage = response_body.get("usage", {})
+                input_tokens = usage.get("input_tokens", 0)
+                output_tokens = usage.get("output_tokens", 0)
+                self._batch_input_tokens += input_tokens
+                self._batch_output_tokens += output_tokens
+                logger.debug(
+                    "llm_judgment_token_usage",
+                    url=article.url,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                )
 
                 # JSON解析
                 judgment_data = self._parse_response(content)

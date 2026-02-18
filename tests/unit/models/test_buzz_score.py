@@ -13,7 +13,6 @@ class TestBuzzScore:
         """BuzzScoreインスタンスが正しく生成されることを確認."""
         buzz_score = BuzzScore(
             url="https://example.com/article",
-            recency_score=100.0,
             social_proof_score=50.0,
             interest_score=80.0,
             authority_score=100.0,
@@ -22,7 +21,6 @@ class TestBuzzScore:
         )
 
         assert buzz_score.url == "https://example.com/article"
-        assert buzz_score.recency_score == 100.0
         assert buzz_score.social_proof_score == 50.0
         assert buzz_score.interest_score == 80.0
         assert buzz_score.authority_score == 100.0
@@ -33,7 +31,6 @@ class TestBuzzScore:
         """BuzzScoreの各フィールドの型が正しいことを確認."""
         buzz_score = BuzzScore(
             url="https://example.com/article",
-            recency_score=90.5,
             social_proof_score=20.0,
             interest_score=60.0,
             authority_score=50.0,
@@ -42,7 +39,6 @@ class TestBuzzScore:
         )
 
         assert isinstance(buzz_score.url, str)
-        assert isinstance(buzz_score.recency_score, float)
         assert isinstance(buzz_score.social_proof_score, float)
         assert isinstance(buzz_score.interest_score, float)
         assert isinstance(buzz_score.authority_score, float)
@@ -53,7 +49,6 @@ class TestBuzzScore:
         """BuzzScoreが0値でも正しく動作することを確認."""
         buzz_score = BuzzScore(
             url="https://example.com/old-article",
-            recency_score=0.0,
             social_proof_score=0.0,
             interest_score=40.0,
             authority_score=0.0,
@@ -61,7 +56,6 @@ class TestBuzzScore:
             total_score=14.0,  # interest_score * 0.35
         )
 
-        assert buzz_score.recency_score == 0.0
         assert buzz_score.social_proof_score == 0.0
         assert buzz_score.interest_score == 40.0
         assert buzz_score.authority_score == 0.0
@@ -72,7 +66,6 @@ class TestBuzzScore:
         """BuzzScoreが最大値でも正しく動作することを確認."""
         buzz_score = BuzzScore(
             url="https://example.com/hot-article",
-            recency_score=100.0,
             social_proof_score=100.0,
             interest_score=100.0,
             authority_score=100.0,
@@ -80,7 +73,6 @@ class TestBuzzScore:
             total_score=100.0,
         )
 
-        assert buzz_score.recency_score == 100.0
         assert buzz_score.social_proof_score == 100.0
         assert buzz_score.interest_score == 100.0
         assert buzz_score.authority_score == 100.0
@@ -95,7 +87,6 @@ class TestToBuzzLabel:
         """テスト用BuzzScoreを生成するヘルパー."""
         return BuzzScore(
             url="https://example.com/article",
-            recency_score=0.0,
             social_proof_score=0.0,
             interest_score=0.0,
             authority_score=0.0,
@@ -153,7 +144,6 @@ class TestExternalBuzz:
         """テスト用BuzzScoreを生成するヘルパー."""
         return BuzzScore(
             url="https://example.com/article",
-            recency_score=0.0,
             social_proof_score=0.0,
             interest_score=interest_score,
             authority_score=0.0,

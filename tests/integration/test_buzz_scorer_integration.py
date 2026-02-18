@@ -15,7 +15,7 @@ from src.services.social_proof.multi_source_social_proof_fetcher import (
 
 
 class TestBuzzScorerIntegration:
-    """BuzzScorerの統合テスト（4指標統合版）."""
+    """BuzzScorerの統合テスト（3要素版）."""
 
     @pytest.fixture
     def interest_profile(self):
@@ -44,7 +44,7 @@ class TestBuzzScorerIntegration:
     async def test_buzz_scorer_with_real_dependencies(
         self, buzz_scorer, social_proof_fetcher
     ):
-        """実際のInterestProfile、SourceMasterを使用して4要素が正しく計算されること."""
+        """実際のInterestProfile、SourceMasterを使用して3要素が正しく計算されること."""
         # テスト記事（Zenn、AI Coding関連、新しい記事）
         article = Article(
             url="https://zenn.dev/example/articles/ai-coding-test",
@@ -67,25 +67,23 @@ class TestBuzzScorerIntegration:
         buzz_score = scores[article.normalized_url]
 
         # 各要素スコアが正しく計算されていることを確認
-        assert buzz_score.recency_score == 100.0  # 今日の記事
         assert buzz_score.social_proof_score == 25.0  # 4指標統合スコア
         assert buzz_score.interest_score == 80.0  # AI Coding（high_interest一致）
         assert buzz_score.authority_score == 50.0  # Zenn（MEDIUM）
 
-        # 総合スコアが正しく計算されていることを確認（4要素版）
-        # (25 * 0.45) + (interest * 0.35) + (100 * 0.15) + (50 * 0.05)
-        # interest_scoreは実際のinterests.yamlに依存
-        expected = (25 * 0.45) + (buzz_score.interest_score * 0.35) + (100 * 0.15) + (50 * 0.05)
+        # 総合スコアが正しく計算されていることを確認（3要素版）
+        # (25 * 0.55) + (interest * 0.35) + (50 * 0.10)
+        expected = (25 * 0.55) + (buzz_score.interest_score * 0.35) + (50 * 0.10)
         assert buzz_score.total_score == pytest.approx(expected, abs=0.01)
 
     @pytest.mark.asyncio
     async def test_no_single_element_dominates(self, buzz_scorer, social_proof_fetcher):
         """単一要素が支配しないことを検証."""
-        # ケース1: Recencyのみ高い記事（その他は低い）
+        # ケース1: SocialProofが低い記事
         article1 = Article(
             url="https://example.com/new-but-boring",
             title="Unrelated topic",
-            published_at=datetime.now(timezone.utc),  # Recency: 100点
+            published_at=datetime.now(timezone.utc),
             source_name="Qiita（トレンド）",  # Authority: 50点
             description="Some other topic",
             normalized_url="https://example.com/new-but-boring",
@@ -100,17 +98,17 @@ class TestBuzzScorerIntegration:
         scores = await buzz_scorer.calculate_scores([article1])
         buzz_score1 = scores[article1.normalized_url]
 
-        # Recency 100点でも、総合スコアは100点にならない（4要素版）
-        # (0 * 0.45) + (interest * 0.35) + (100 * 0.15) + (50 * 0.05)
-        expected1 = (0 * 0.45) + (buzz_score1.interest_score * 0.35) + (100 * 0.15) + (50 * 0.05)
+        # SocialProof 0点の場合、総合スコアは100点にならない（3要素版）
+        # (0 * 0.55) + (interest * 0.35) + (50 * 0.10)
+        expected1 = (0 * 0.55) + (buzz_score1.interest_score * 0.35) + (50 * 0.10)
         assert buzz_score1.total_score < 100.0
         assert buzz_score1.total_score == pytest.approx(expected1, abs=0.01)
 
-        # ケース2: SocialProofのみ高い記事（その他は低い）
+        # ケース2: SocialProofのみ高い記事
         article2 = Article(
             url="https://example.com/old-but-popular",
             title="Old popular article",
-            published_at=datetime.now(timezone.utc),  # Recency: 100点（新しい記事）
+            published_at=datetime.now(timezone.utc),
             source_name="Qiita（トレンド）",  # Authority: 50点
             description="Unrelated content",
             normalized_url="https://example.com/old-but-popular",
@@ -125,9 +123,9 @@ class TestBuzzScorerIntegration:
         scores = await buzz_scorer.calculate_scores([article2])
         buzz_score2 = scores[article2.normalized_url]
 
-        # SocialProof 100点でも、総合スコアは100点にならない（4要素版）
-        # (100 * 0.45) + (interest * 0.35) + (100 * 0.15) + (50 * 0.05)
-        expected2 = (100 * 0.45) + (buzz_score2.interest_score * 0.35) + (100 * 0.15) + (50 * 0.05)
+        # SocialProof 100点でも、総合スコアは100点にならない（3要素版）
+        # (100 * 0.55) + (interest * 0.35) + (50 * 0.10)
+        expected2 = (100 * 0.55) + (buzz_score2.interest_score * 0.35) + (50 * 0.10)
         assert buzz_score2.total_score < 100.0
         assert buzz_score2.total_score == pytest.approx(expected2, abs=0.01)
 
@@ -135,7 +133,6 @@ class TestBuzzScorerIntegration:
     async def test_no_missing_important_articles(self, buzz_scorer, social_proof_fetcher):
         """取りこぼし防止のシナリオ検証."""
         # ケース1: 公式ブログ（Authority高）が低SocialProofでも一定スコア維持
-        # AWS公式ブログはコメントアウトされているため、Qiitaで代替
         article_official = Article(
             url="https://qiita.com/official-blog",
             title="公式アナウンス",
@@ -189,31 +186,29 @@ class TestBuzzScorerIntegration:
         articles = [article_official, article_interest, article_no_interest, article_popular]
         scores = await buzz_scorer.calculate_scores(articles)
 
-        # ケース1検証: 公式記事が低SocialProofでも一定スコアを維持（4要素版）
+        # ケース1検証: 公式記事が低SocialProofでも一定スコアを維持（3要素版）
         official_score = scores[article_official.normalized_url]
-        # (5 * 0.45) + (interest * 0.35) + (100 * 0.15) + (50 * 0.05)
+        # (5 * 0.55) + (interest * 0.35) + (50 * 0.10)
         expected_official = (
-            (5 * 0.45)
+            (5 * 0.55)
             + (official_score.interest_score * 0.35)
-            + (100 * 0.15)
-            + (50 * 0.05)
+            + (50 * 0.10)
         )
         assert official_score.total_score == pytest.approx(expected_official, abs=0.01)
 
-        # ケース2検証: Interest一致記事が同条件（同じSocialProof）で優先（4要素版）
+        # ケース2検証: Interest一致記事が同条件（同じSocialProof）で優先（3要素版）
         interest_score_result = scores[article_interest.normalized_url]
         no_interest_score = scores[article_no_interest.normalized_url]
         # Interest一致記事のほうが高スコア
         assert interest_score_result.total_score > no_interest_score.total_score
 
-        # ケース3検証: 話題記事が興味外でも一定スコアを維持（4要素版）
+        # ケース3検証: 話題記事が興味外でも一定スコアを維持（3要素版）
         popular_score = scores[article_popular.normalized_url]
-        # (100 * 0.45) + (interest * 0.35) + (100 * 0.15) + (50 * 0.05)
+        # (100 * 0.55) + (interest * 0.35) + (50 * 0.10)
         expected_popular = (
-            (100 * 0.45)
+            (100 * 0.55)
             + (popular_score.interest_score * 0.35)
-            + (100 * 0.15)
-            + (50 * 0.05)
+            + (50 * 0.10)
         )
         assert popular_score.total_score >= 60.0  # 一定スコアを維持
         assert popular_score.total_score == pytest.approx(expected_popular, abs=0.01)

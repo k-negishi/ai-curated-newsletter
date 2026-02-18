@@ -1,6 +1,7 @@
 """MultiSourceSocialProofFetcherモジュール."""
 
 import asyncio
+from urllib.parse import urlparse
 
 from src.models.article import Article
 from src.services.social_proof.hatena_count_fetcher import HatenaCountFetcher
@@ -16,13 +17,14 @@ class MultiSourceSocialProofFetcher:
     """複数情報源からSocialProofスコアを統合取得するサービス.
 
     4つの情報源（yamadashy, Hatena, Zenn, Qiita）からスコアを取得し、
-    重み付け統合を行う。
+    URLドメインに基づく適用重み正規化で統合スコアを算出する。
 
-    統合計算式: S = (0.05Y + 0.45H + 0.35Z + 0.15Q) / 1.0
+    ドメイン別の適用指標:
+    - zenn.dev  → Y + H + Z（Qは除外）→ 適用重み合計 0.85
+    - qiita.com → Y + H + Q（Zは除外）→ 適用重み合計 0.65
+    - その他    → Y + H（Z, Qは除外）→ 適用重み合計 0.50
 
-    スコア0の扱い:
-    - スコア0も正しくデータとして扱う（欠損と区別）
-    - 全ての指標を統合計算に含める
+    統合計算式: S = 適用指標の加重合計 / 適用重み合計
 
     Attributes:
         _yamadashy_fetcher: yamadashy掲載シグナル取得
@@ -76,7 +78,7 @@ class MultiSourceSocialProofFetcher:
         if not articles:
             return {}
 
-        logger.info("multi_source_social_proof_fetch_start", article_count=len(articles))
+        logger.debug("multi_source_social_proof_fetch_start", article_count=len(articles))
 
         urls = [article.url for article in articles]
 
@@ -125,7 +127,10 @@ class MultiSourceSocialProofFetcher:
         zenn_scores: dict[str, float],
         qiita_scores: dict[str, float],
     ) -> dict[str, float]:
-        """4指標を統合してSocialProofスコアを計算する.
+        """4指標をURLドメインに基づく適用重み正規化で統合する.
+
+        URLのドメインに応じて適用可能な指標のみを使い、
+        適用重みの合計で正規化することで、ドメイン間のスコアを公平に比較する。
 
         Args:
             urls: 記事URLリスト
@@ -146,19 +151,23 @@ class MultiSourceSocialProofFetcher:
             z = zenn_scores.get(url, 0.0)
             q = qiita_scores.get(url, 0.0)
 
-            # 全ての指標を統合計算に含める（スコア0も正しく扱う）
-            observed_weights = (
-                self.WEIGHT_YAMADASHY + self.WEIGHT_HATENA + self.WEIGHT_ZENN + self.WEIGHT_QIITA
-            )
-            weighted_sum = (
-                self.WEIGHT_YAMADASHY * y
-                + self.WEIGHT_HATENA * h
-                + self.WEIGHT_ZENN * z
-                + self.WEIGHT_QIITA * q
-            )
+            # ドメイン判定
+            netloc = urlparse(url).netloc
 
-            # 統合スコア計算
-            score = weighted_sum / observed_weights
+            # Y と H は全ドメイン共通で適用
+            weighted_sum = self.WEIGHT_YAMADASHY * y + self.WEIGHT_HATENA * h
+            applicable_weight = self.WEIGHT_YAMADASHY + self.WEIGHT_HATENA
+
+            # ドメイン固有の指標を追加
+            if "zenn.dev" in netloc:
+                weighted_sum += self.WEIGHT_ZENN * z
+                applicable_weight += self.WEIGHT_ZENN
+            elif "qiita.com" in netloc:
+                weighted_sum += self.WEIGHT_QIITA * q
+                applicable_weight += self.WEIGHT_QIITA
+
+            # 統合スコア計算（適用重みで正規化）
+            score = weighted_sum / applicable_weight
 
             integrated_scores[url] = score
 
@@ -169,6 +178,7 @@ class MultiSourceSocialProofFetcher:
                 h=h,
                 z=z,
                 q=q,
+                applicable_weight=applicable_weight,
                 score=score,
             )
 

@@ -1,7 +1,8 @@
 """HatenaCountFetcherモジュール."""
 
 import asyncio
-import math
+import time
+from typing import ClassVar
 from urllib.parse import urlencode
 
 import httpx
@@ -25,6 +26,17 @@ class HatenaCountFetcher:
 
     HATENA_BATCH_API_URL = "https://bookmark.hatenaapis.com/count/entries"
     DEFAULT_BATCH_SIZE = 50
+
+    HATENA_SCORE_TABLE: ClassVar[list[tuple[int, float]]] = [
+        (500, 100.0),  # 500件以上: 大事件
+        (200, 92.0),  # 200〜499件: 大バズ
+        (100, 80.0),  # 100〜199件: バズ
+        (50, 65.0),  # 50〜99件: 話題
+        (30, 50.0),  # 30〜49件: 良記事
+        (15, 25.0),  # 15〜29件: 注目され始め
+        (5, 12.0),  # 5〜14件: わずかに注目
+        (1, 5.0),  # 1〜4件: ほぼノイズ
+    ]
 
     def __init__(
         self,
@@ -52,7 +64,8 @@ class HatenaCountFetcher:
         if not urls:
             return {}
 
-        logger.info("hatena_fetch_batch_start", url_count=len(urls))
+        start_time = time.time()
+        logger.debug("hatena_fetch_batch_start", url_count=len(urls))
 
         # 50件ごとに分割
         batches = [urls[i : i + self._batch_size] for i in range(0, len(urls), self._batch_size)]
@@ -74,10 +87,12 @@ class HatenaCountFetcher:
         # スコア計算
         scores = self._calculate_scores(all_counts)
 
+        elapsed = time.time() - start_time
         logger.info(
             "hatena_fetch_batch_complete",
             url_count=len(urls),
             success_count=len(scores),
+            elapsed_seconds=round(elapsed, 2),
         )
 
         return scores
@@ -123,13 +138,18 @@ class HatenaCountFetcher:
             raise
 
     def _calculate_scores(self, counts: dict[str, int]) -> dict[str, float]:
-        """ブックマーク数からスコアを計算する.
+        """ブックマーク数からスコアを計算する（区間マッピング方式）.
 
-        スコア計算式: H = min(100, log10(count + 1) * 25)
+        HATENA_SCORE_TABLEを降順に走査し、最初にマッチした閾値のスコアを返す。
+        - 500件以上: 100点（大事件）
+        - 200〜499件: 92点（大バズ）
+        - 100〜199件: 80点（バズ）
+        - 50〜99件: 65点（話題）
+        - 30〜49件: 50点（良記事）
+        - 15〜29件: 25点（注目され始め）
+        - 5〜14件: 12点（わずかに注目）
+        - 1〜4件: 5点（ほぼノイズ）
         - 0件: 0点
-        - 100件: 50点
-        - 1000件: 75点
-        - 10000件: 100点
 
         Args:
             counts: URLをキーとするブックマーク数の辞書
@@ -139,11 +159,11 @@ class HatenaCountFetcher:
         """
         scores = {}
         for url, count in counts.items():
-            # log10(count + 1) * 25
-            score = math.log10(count + 1) * 25
-            # 100点上限
-            score = min(100.0, score)
-
+            score = 0.0
+            for threshold, mapped_score in self.HATENA_SCORE_TABLE:
+                if count >= threshold:
+                    score = mapped_score
+                    break
             scores[url] = score
 
         return scores

@@ -1,6 +1,6 @@
 """BuzzScorerサービスのユニットテスト（4要素統合版）."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -107,57 +107,6 @@ class TestBuzzScorer:
             normalized_url="https://example.com/article",
             collected_at=datetime.now(timezone.utc),
         )
-
-    def test_calculate_recency_score_new(self, buzz_scorer: BuzzScorer) -> None:
-        """新しい記事の鮮度スコアが高いことを確認."""
-        article = Article(
-            url="https://example.com/article",
-            title="Test",
-            published_at=datetime.now(timezone.utc),
-            source_name="Test",
-            description="Test",
-            normalized_url="https://example.com/article",
-            collected_at=datetime.now(timezone.utc),
-        )
-
-        score = buzz_scorer._calculate_recency_score(article)
-
-        # days_old = 0, score = 100 - (0 * 10) = 100
-        assert score == 100.0
-
-    def test_calculate_recency_score_old(self, buzz_scorer: BuzzScorer) -> None:
-        """古い記事の鮮度スコアが低いことを確認."""
-        article = Article(
-            url="https://example.com/article",
-            title="Test",
-            published_at=datetime.now(timezone.utc) - timedelta(days=5),
-            source_name="Test",
-            description="Test",
-            normalized_url="https://example.com/article",
-            collected_at=datetime.now(timezone.utc),
-        )
-
-        score = buzz_scorer._calculate_recency_score(article)
-
-        # days_old = 5, score = 100 - (5 * 10) = 50
-        assert score == 50.0
-
-    def test_calculate_recency_score_min(self, buzz_scorer: BuzzScorer) -> None:
-        """鮮度スコアが0を下回らないことを確認."""
-        article = Article(
-            url="https://example.com/article",
-            title="Test",
-            published_at=datetime.now(timezone.utc) - timedelta(days=20),
-            source_name="Test",
-            description="Test",
-            normalized_url="https://example.com/article",
-            collected_at=datetime.now(timezone.utc),
-        )
-
-        score = buzz_scorer._calculate_recency_score(article)
-
-        # max(100 - (20 * 10), 0) = 0
-        assert score == 0.0
 
     def test_calculate_interest_score_max(self, buzz_scorer: BuzzScorer) -> None:
         """Interestスコア: max_interest一致時に100点."""
@@ -307,19 +256,18 @@ class TestBuzzScorer:
         assert score == 0.0
 
     def test_calculate_total_score(self, buzz_scorer: BuzzScorer) -> None:
-        """総合スコアが正しく計算されることを確認（4要素、SNS重視版）."""
-        recency = 100.0
+        """総合スコアが正しく計算されることを確認（3要素版）."""
         social_proof = 50.0
         interest = 80.0
         authority = 100.0
 
         total = buzz_scorer._calculate_total_score(
-            recency, social_proof, interest, authority
+            social_proof, interest, authority
         )
 
-        # (50 * 0.45) + (80 * 0.35) + (100 * 0.15) + (100 * 0.05)
-        # = 22.5 + 28 + 15 + 5 = 70.5
-        assert total == 70.5
+        # (50 * 0.55) + (80 * 0.35) + (100 * 0.10)
+        # = 27.5 + 28 + 10 = 65.5
+        assert total == 65.5
 
     @pytest.mark.asyncio
     async def test_calculate_scores(
@@ -343,6 +291,5 @@ class TestBuzzScorer:
         assert score.social_proof_count == 0  # 4指標統合版では個別カウント不要
         assert score.social_proof_score == 65.0  # MultiSourceSocialProofFetcherから取得
         assert 0.0 <= score.total_score <= 100.0
-        assert 0.0 <= score.recency_score <= 100.0
         assert 0.0 <= score.interest_score <= 100.0
         assert 0.0 <= score.authority_score <= 100.0

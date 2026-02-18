@@ -596,6 +596,122 @@ async def test_judge_single_uses_custom_backoff_config(
 
     assert result is not None
     assert result.interest_label.value == "ACT_NOW"
+# Phase 3: トークン数ログのテスト
+
+
+@pytest.mark.asyncio
+async def test_judge_single_logs_token_usage(
+    mock_interest_profile: InterestProfile, sample_article: Article
+) -> None:
+    """_judge_single がBedrockレスポンスのトークン数をDEBUGログに出力することを確認."""
+    # Arrange
+    mock_bedrock = MagicMock()
+    mock_bedrock.invoke_model.return_value = {
+        "body": MagicMock(
+            read=MagicMock(
+                return_value=json.dumps({
+                    "content": [{"text": json.dumps({
+                        "interest_label": "ACT_NOW",
+                        "confidence": 0.9,
+                        "summary": "test",
+                        "tags": []
+                    })}],
+                    "usage": {
+                        "input_tokens": 150,
+                        "output_tokens": 50
+                    }
+                }).encode()
+            )
+        )
+    }
+
+    llm_judge = LlmJudge(
+        bedrock_client=mock_bedrock,
+        cache_repository=None,
+        interest_profile=mock_interest_profile,
+        model_id="test-model",
+    )
+
+    # Act
+    with patch("src.services.llm_judge.logger") as mock_logger:
+        result = await llm_judge._judge_single(sample_article)
+
+    # Assert
+    assert result.interest_label.value == "ACT_NOW"
+    mock_logger.debug.assert_any_call(
+        "llm_judgment_token_usage",
+        url="https://example.com/article1",
+        input_tokens=150,
+        output_tokens=50,
+    )
+
+
+@pytest.mark.asyncio
+async def test_judge_batch_logs_total_token_usage(
+    mock_interest_profile: InterestProfile, sample_article: Article
+) -> None:
+    """judge_batch がバッチ全体の合計トークン数をINFOログに出力することを確認."""
+    # Arrange
+    mock_bedrock = MagicMock()
+
+    # 2記事分のレスポンス（それぞれ異なるトークン数）
+    def make_response(input_tokens: int, output_tokens: int) -> dict:
+        return {
+            "body": MagicMock(
+                read=MagicMock(
+                    return_value=json.dumps({
+                        "content": [{"text": json.dumps({
+                            "interest_label": "ACT_NOW",
+                            "confidence": 0.9,
+                            "summary": "test",
+                            "tags": []
+                        })}],
+                        "usage": {
+                            "input_tokens": input_tokens,
+                            "output_tokens": output_tokens,
+                        }
+                    }).encode()
+                )
+            )
+        }
+
+    mock_bedrock.invoke_model.side_effect = [
+        make_response(100, 30),
+        make_response(120, 40),
+    ]
+
+    llm_judge = LlmJudge(
+        bedrock_client=mock_bedrock,
+        cache_repository=None,
+        interest_profile=mock_interest_profile,
+        model_id="test-model",
+        max_retries=0,
+    )
+
+    articles = [sample_article, sample_article]
+
+    # Act
+    with patch("src.services.llm_judge.logger") as mock_logger:
+        result = await llm_judge.judge_batch(articles)
+
+    # Assert
+    assert len(result.judgments) == 2
+    # elapsed_seconds は実行時間に依存するため、呼び出し引数を個別に検証
+    info_calls = mock_logger.info.call_args_list
+    complete_call = [
+        c for c in info_calls if c.args and c.args[0] == "llm_judgment_complete"
+    ]
+    assert len(complete_call) == 1
+    kwargs = complete_call[0].kwargs
+    assert kwargs["total_count"] == 2
+    assert kwargs["success_count"] == 2
+    assert kwargs["failed_count"] == 0
+    assert kwargs["total_input_tokens"] == 220
+    assert kwargs["total_output_tokens"] == 70
+    assert "elapsed_seconds" in kwargs
+    assert isinstance(kwargs["elapsed_seconds"], float)
+
+
 # Phase 4: 並列リクエスト間隔のテスト
 
 
@@ -631,6 +747,7 @@ async def test_judge_batch_applies_request_interval(
         cache_repository=None,
         interest_profile=mock_interest_profile,
         model_id="test-model",
+        concurrency_limit=5,  # デフォルト値を明示（stagger計算の前提）
         request_interval=request_interval,
         max_retries=0,  # リトライを無効化してテストを簡略化
     )
@@ -643,10 +760,84 @@ async def test_judge_batch_applies_request_interval(
         result = await llm_judge.judge_batch(articles)
 
         # Assert
-        # リクエスト間隔が実装されたので、asyncio.sleep が request_interval で呼ばれる
-        # 2つの記事があるので、2回呼ばれる
-        assert mock_sleep.call_count == 2
+        # staggered delay: index=0 → 0.0（スキップ）, index=1 → 1*(0.5/5)=0.1
+        # request_interval: 2記事 × 0.5 = 2回
+        # 合計: staggered 1回(index=1のみ) + request_interval 2回 = 3回
+        assert mock_sleep.call_count == 3
         mock_sleep.assert_any_call(request_interval)
 
     # 判定は失敗するが、フォールバック判定が返される
     assert len(result.judgments) == 2
+
+
+# Phase 5: staggered start のテスト
+
+
+@pytest.mark.asyncio
+async def test_judge_batch_applies_staggered_start(
+    mock_interest_profile: InterestProfile, sample_article: Article
+) -> None:
+    """初回バッチのワーカーにstaggered delayが適用されることを確認."""
+    # Arrange
+    mock_bedrock = MagicMock()
+    concurrency_limit = 3
+    request_interval = 3.0
+
+    # 成功レスポンス
+    mock_bedrock.invoke_model.return_value = {
+        "body": MagicMock(
+            read=MagicMock(
+                return_value=json.dumps({
+                    "content": [{
+                        "text": json.dumps({
+                            "interest_label": "ACT_NOW",
+                            "confidence": 0.9,
+                            "summary": "テスト理由",
+                            "tags": ["Test"]
+                        })
+                    }]
+                }).encode()
+            )
+        )
+    }
+
+    llm_judge = LlmJudge(
+        bedrock_client=mock_bedrock,
+        cache_repository=None,
+        interest_profile=mock_interest_profile,
+        model_id="test-model",
+        concurrency_limit=concurrency_limit,
+        request_interval=request_interval,
+        max_retries=0,
+    )
+
+    # 3つの記事でテスト（= concurrency_limit と同数）
+    articles = [sample_article, sample_article, sample_article]
+
+    # Act
+    with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+        result = await llm_judge.judge_batch(articles)
+
+        # Assert
+        # staggered delay の呼び出しを検証:
+        # index=0: stagger_delay=0.0 → sleepしない (stagger_delay > 0 の条件)
+        # index=1: stagger_delay=1.0 → asyncio.sleep(1.0)
+        # index=2: stagger_delay=2.0 → asyncio.sleep(2.0)
+        # さらに、各ワーカーでセマフォ内の request_interval sleep が呼ばれる
+        # 合計: staggered 2回 + request_interval 3回 = 5回
+        assert mock_sleep.call_count == 5, (
+            f"Expected 5 sleep calls (2 stagger + 3 interval), got {mock_sleep.call_count}"
+        )
+        sleep_calls = [call.args[0] for call in mock_sleep.call_args_list]
+
+        # staggered delay の値が含まれていることを確認
+        assert 1.0 in sleep_calls, f"stagger delay 1.0 not found in {sleep_calls}"
+        assert 2.0 in sleep_calls, f"stagger delay 2.0 not found in {sleep_calls}"
+
+        # request_interval の呼び出し回数を確認（3記事分）
+        interval_calls = [c for c in sleep_calls if c == request_interval]
+        assert len(interval_calls) == 3, (
+            f"Expected 3 request_interval calls, got {len(interval_calls)}: {sleep_calls}"
+        )
+
+    assert len(result.judgments) == 3

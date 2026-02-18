@@ -15,7 +15,6 @@ def _make_buzz_score(
     """テスト用のBuzzScoreを生成するヘルパー."""
     return BuzzScore(
         url=url,
-        recency_score=0.0,
         social_proof_score=0.0,
         interest_score=interest_score,
         authority_score=0.0,

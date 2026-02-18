@@ -14,7 +14,6 @@ logger = get_logger(__name__)
 # BuzzScoreが見つからない場合のフォールバック用ゼロスコア
 _ZERO_BUZZ_SCORE = BuzzScore(
     url="",
-    recency_score=0.0,
     social_proof_score=0.0,
     interest_score=0.0,
     authority_score=0.0,
@@ -90,7 +89,7 @@ class FinalSelector:
         Returns:
             最終選定結果（最大15件）
         """
-        logger.info(
+        logger.debug(
             "final_selection_start",
             judgment_count=len(judgments),
             max_articles=self._max_articles,
@@ -108,8 +107,11 @@ class FinalSelector:
         # ステップ2: Composite Scoreでソート
         sorted_judgments = self._sort_by_priority(non_ignore_judgments, buzz_scores)
 
+        # ステップ2.5: 候補ランキングをログ出力
+        self._log_candidates(sorted_judgments, buzz_scores)
+
         # ステップ3: ドメイン偏り制御しながら選定
-        selected = self._select_with_domain_control(sorted_judgments)
+        selected = self._select_with_domain_control(sorted_judgments, buzz_scores)
 
         logger.info(
             "final_selection_complete",
@@ -162,13 +164,38 @@ class FinalSelector:
             ),
         )
 
+    def _log_candidates(
+        self,
+        sorted_judgments: list[JudgmentResult],
+        buzz_scores: dict[str, BuzzScore] | None = None,
+    ) -> None:
+        """候補ランキングをログ出力する."""
+        for rank, j in enumerate(sorted_judgments, start=1):
+            bs = (buzz_scores or {}).get(j.url, _ZERO_BUZZ_SCORE)
+            composite = self._calculate_composite_score(j.interest_label, bs)
+            logger.debug(
+                "final_candidate",
+                rank=rank,
+                title=j.title,
+                url=j.url,
+                composite_score=round(composite, 1),
+                interest_label=j.interest_label.value,
+                buzz_label=j.buzz_label.value,
+                external_buzz=round(bs.external_buzz, 1),
+                total_score=round(bs.total_score, 1),
+                social_proof_score=round(bs.social_proof_score, 1),
+            )
+
     def _select_with_domain_control(
-        self, sorted_judgments: list[JudgmentResult]
+        self,
+        sorted_judgments: list[JudgmentResult],
+        buzz_scores: dict[str, BuzzScore] | None = None,
     ) -> list[JudgmentResult]:
         """ドメイン偏り制御しながら選定する.
 
         Args:
             sorted_judgments: ソート済み判定結果のリスト
+            buzz_scores: URL→BuzzScoreのマッピング
 
         Returns:
             選定された判定結果のリスト（最大max_articles件）
@@ -195,15 +222,22 @@ class FinalSelector:
                 continue
 
             # 選定に追加
+            bs = (buzz_scores or {}).get(judgment.url, _ZERO_BUZZ_SCORE)
+            composite = self._calculate_composite_score(judgment.interest_label, bs)
             selected.append(judgment)
             domain_counts[domain] += 1
 
             logger.debug(
                 "article_selected",
+                rank=len(selected),
+                title=judgment.title,
                 url=judgment.url,
+                composite_score=round(composite, 1),
                 interest_label=judgment.interest_label.value,
-                domain=domain,
-                domain_count=domain_counts[domain],
+                buzz_label=judgment.buzz_label.value,
+                external_buzz=round(bs.external_buzz, 1),
+                total_score=round(bs.total_score, 1),
+                social_proof_score=round(bs.social_proof_score, 1),
             )
 
         return selected
