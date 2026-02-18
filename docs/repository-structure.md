@@ -48,8 +48,9 @@ ai-curated-newsletter/
 │       ├── config.py          # アプリケーション設定管理
 │       ├── utils/            # 汎用ユーティリティ
 │       │   ├── __init__.py
-│       │   ├── url_normalizer.py  # URL正規化
-│       │   └── date_utils.py      # 日時ユーティリティ
+│       │   ├── url_normalizer.py         # URL正規化
+│       │   ├── date_utils.py             # 日時ユーティリティ
+│       │   └── bedrock_cost_estimator.py # Bedrockコスト推定ユーティリティ
 │       ├── logging/          # ログ設定
 │       │   ├── __init__.py
 │       │   └── logger.py     # structlog設定
@@ -357,6 +358,7 @@ class Article:
 - `utils/`: 汎用ユーティリティ関数
   - `url_normalizer.py`: URL正規化
   - `date_utils.py`: 日時ユーティリティ
+  - `bedrock_cost_estimator.py`: Bedrock API コスト推定
 - `logging/`: ログ設定
   - `logger.py`: structlog設定
 - `exceptions/`: カスタム例外

@@ -86,6 +86,14 @@ where:
   authority_score = OFFICIAL: 100, HIGH: 80, MEDIUM: 50, LOW/未設定: 0
 ```
 
+**external_buzz（外部話題性）**:
+total_scoreからinterest成分を除去し、残りを0-100スケールに正規化したもの。Composite Scoreの構成要素（60%）として使用。
+
+```
+external_buzz = (total_score - interest_score × 0.35) / 0.65
+（clamp: 0.0 ～ 100.0）
+```
+
 **関連用語**:
 - [候補選定](#候補選定): Buzzスコアでソートして上位を選定
 - [Composite Score](#composite-score): Buzzスコアのexternal_buzzがComposite Scoreの構成要素
@@ -864,9 +872,11 @@ class Article:
 **定義**: LLM判定結果のエンティティ
 
 **主要フィールド**:
-- `url`: 記事URL
+- `url`: 記事URL（キャッシュキー）
+- `title`: 記事タイトル
+- `description`: 記事の概要（最大800文字、RSS/Atomから取得、LLMプロンプトの入力として使用）
 - `interest_label`: 関心度ラベル（ACT_NOW/THINK/FYI/IGNORE）
-- `buzz_label`: 話題性ラベル（HIGH/MID/LOW）
+- `buzz_label`: 話題性ラベル（HIGH/MID/LOW）※LLMでは判定しない。BuzzScore.to_buzz_label()でOrchestratorが事後設定
 - `confidence`: 信頼度（0.0-1.0）
 - `summary`: LLM生成の要約（最大300文字、メール表示用）
 - `tags`: 記事タグ（例: ["Kotlin", "Claude"]）
@@ -879,14 +889,16 @@ class Article:
 @dataclass
 class JudgmentResult:
     url: str
+    title: str
+    description: str
     interest_label: Literal["ACT_NOW", "THINK", "FYI", "IGNORE"]
     buzz_label: Literal["HIGH", "MID", "LOW"]
     confidence: float
     summary: str
-    tags: list[str]
-    published_at: datetime
     model_id: str
     judged_at: datetime
+    published_at: datetime
+    tags: list[str] = field(default_factory=list)
 ```
 
 **実装箇所**: `src/models/judgment.py`
