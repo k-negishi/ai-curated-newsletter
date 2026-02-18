@@ -26,11 +26,6 @@ jobs:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsDeployRole
           aws-region: ap-northeast-1
 
-      - name: Set up Python 3.14
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.14'
-
       - name: Install AWS SAM CLI
         uses: aws-actions/setup-sam@v2
 
