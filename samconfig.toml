@@ -1,0 +1,7 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "ai-curated-newsletter"
+region = "ap-northeast-1"
+capabilities = "CAPABILITY_IAM"
+resolve_s3 = true
