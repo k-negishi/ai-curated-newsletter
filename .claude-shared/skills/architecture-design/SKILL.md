@@ -1,4 +1,3 @@
-
 ---
 name: architecture-design
 description: アーキテクチャ設計書を作成するための詳細ガイドとテンプレート。アーキテクチャ設計時にのみ使用。

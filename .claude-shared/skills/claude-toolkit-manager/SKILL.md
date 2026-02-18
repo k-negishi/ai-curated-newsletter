@@ -1,3 +1,9 @@
+---
+name: claude-toolkit-manager
+description: Claude Codeのコマンド・スキル・エージェントファイルを作成・更新し、共通リポジトリとプロジェクト固有ファイルを適切に管理するスキル。新しいコマンド/スキル/エージェント作成・更新時に使用。
+allowed-tools: Read, Write, Edit, Bash, AskUserQuestion
+---
+
 # Claude Toolkit Manager
 
 **目的**: Claude Code のコマンド・スキル・エージェントファイルを作成・更新し、共通リポジトリとプロジェクト固有ファイルを適切に管理する
