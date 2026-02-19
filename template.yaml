@@ -49,7 +49,7 @@ Resources:
               Action:
                 - bedrock:InvokeModel
               Resource:
-                - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-haiku-4-5*'
+                - 'arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5*'
                 - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*anthropic.claude-haiku-4-5*'
         - Statement:
             - Effect: Allow
