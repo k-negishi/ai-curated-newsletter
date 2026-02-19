@@ -31,6 +31,7 @@ Resources:
       Handler: src.handler.lambda_handler
       Environment:
         Variables:
+          ENVIRONMENT: production
           CACHE_TABLE_NAME: !Ref CacheTable
           HISTORY_TABLE_NAME: !Ref HistoryTable
           SOURCES_CONFIG_PATH: config/sources.yaml
@@ -56,6 +57,12 @@ Resources:
                 - ses:SendEmail
                 - ses:SendRawEmail
               Resource: '*'
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource:
+                - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ai-curated-newsletter/*'
       Events:
         DailySchedule:
           Type: Schedule
