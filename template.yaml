@@ -37,6 +37,7 @@ Resources:
           FROM_EMAIL: !Ref FromEmail
           TO_EMAIL: !Ref ToEmail
           BEDROCK_MODEL_ID: anthropic.claude-haiku-4-5-20251001-v1:0
+          BEDROCK_INFERENCE_PROFILE_ARN: !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/jp.anthropic.claude-haiku-4-5-20251001-v1:0'
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref CacheTable
@@ -46,7 +47,9 @@ Resources:
             - Effect: Allow
               Action:
                 - bedrock:InvokeModel
-              Resource: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-haiku-4-5*'
+              Resource:
+                - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-haiku-4-5*'
+                - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*anthropic.claude-haiku-4-5*'
         - Statement:
             - Effect: Allow
               Action:
