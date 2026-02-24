@@ -256,10 +256,13 @@ class Orchestrator:
                 estimated_cost_usd=estimated_cost,
             )
 
-            # TODO(MVP): DynamoDB未セットアップのため一時的にコメントアウト
-            # self._history_repository.save(summary)
-            # MVPフェーズではログ出力のみ（DynamoDB未使用）
             logger.info("execution_summary", **asdict(summary))
+
+            if self._history_repository is not None:
+                self._history_repository.save(summary)
+                logger.debug("history_saved", run_id=run_id)
+            else:
+                logger.debug("history_save_skipped", run_id=run_id, reason="no_repository")
             logger.debug("step8_complete", run_id=run_id)
 
             logger.info(
