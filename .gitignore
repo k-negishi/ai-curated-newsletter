@@ -1,6 +1,10 @@
 /.idea/
 /.aws-sam/
 
+# Python
+__pycache__/
+*.egg-info/
+
 # Environment variables
 .env
 .env.local
