@@ -38,14 +38,14 @@ class Notifier:
     """
 
     def __init__(
-        self, ses_client: Any, from_email: str, to_email: str, dry_run: bool = False
+        self, ses_client: Any, from_email: str, to_email: list[str], dry_run: bool = False
     ) -> None:
         """通知サービスを初期化する.
 
         Args:
             ses_client: SESクライアント（boto3.client('ses')）
             from_email: 送信元メールアドレス
-            to_email: 送信先メールアドレス
+            to_email: 送信先メールアドレスのリスト
             dry_run: ドライランモード（デフォルト: False）
         """
         self._ses_client = ses_client
@@ -73,7 +73,7 @@ class Notifier:
         logger.debug(
             "notification_start",
             from_email=mask_email(self._from_email),
-            to_email=mask_email(self._to_email),
+            to_email=[mask_email(e) for e in self._to_email],
             subject=subject,
             dry_run=self._dry_run,
         )
@@ -83,7 +83,7 @@ class Notifier:
             logger.debug(
                 "notification_skipped",
                 reason="dry_run_mode_enabled",
-                to_email=mask_email(self._to_email),
+                to_email=[mask_email(e) for e in self._to_email],
             )
             return NotificationResult(message_id="dry-run", sent_at=now_utc())
 
@@ -97,7 +97,7 @@ class Notifier:
 
             response = self._ses_client.send_email(
                 Source=self._from_email,
-                Destination={"ToAddresses": [self._to_email]},
+                Destination={"ToAddresses": self._to_email},
                 Message={
                     "Subject": {"Data": subject, "Charset": "UTF-8"},
                     "Body": message_body,
@@ -111,7 +111,7 @@ class Notifier:
             logger.info(
                 "notification_success",
                 message_id=message_id,
-                to_email=mask_email(self._to_email),
+                to_email=[mask_email(e) for e in self._to_email],
                 elapsed_seconds=round(elapsed, 2),
             )
 
@@ -120,7 +120,7 @@ class Notifier:
         except Exception as e:
             logger.error(
                 "notification_failed",
-                to_email=mask_email(self._to_email),
+                to_email=[mask_email(e) for e in self._to_email],
                 error=str(e),
             )
             raise NotificationError(f"Failed to send email: {e}") from e

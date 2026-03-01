@@ -18,7 +18,7 @@ Parameters:
 
   ToEmail:
     Type: String
-    Description: Recipient email address
+    Description: Recipient email address (comma-separated for multiple addresses)
     Default: recipient@example.com
 
 Resources:

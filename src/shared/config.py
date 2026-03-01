@@ -39,7 +39,7 @@ class AppConfig:
         final_select_max_per_domain: ドメイン当たりの最終選抜記事数上限
         sources_config_path: RSS/Atom ソース設定ファイルパス
         from_email: 送信元メールアドレス
-        to_email: 送信先メールアドレス
+        to_email: 送信先メールアドレスのリスト（カンマ区切りで複数指定可能）
     """
 
     environment: str
@@ -60,7 +60,7 @@ class AppConfig:
     final_select_max_per_domain: int
     sources_config_path: str
     from_email: str
-    to_email: str
+    to_email: list[str]
 
 
 def load_config() -> AppConfig:
@@ -127,7 +127,11 @@ def _load_config_local() -> AppConfig:
             final_select_max_per_domain=int(os.getenv("FINAL_SELECT_MAX_PER_DOMAIN", "0")),
             sources_config_path=os.getenv("SOURCES_CONFIG_PATH", "config/sources.yaml"),
             from_email=os.getenv("FROM_EMAIL", "noreply@example.com"),
-            to_email=os.getenv("TO_EMAIL", "recipient@example.com"),
+            to_email=[
+                addr.strip()
+                for addr in os.getenv("TO_EMAIL", "recipient@example.com").split(",")
+                if addr.strip()
+            ],
         )
         logger.info("config_loaded_successfully", environment="local")
         return config
@@ -221,7 +225,9 @@ def _load_config_from_ssm() -> AppConfig:
             final_select_max_per_domain=int(dotenv_values_dict["FINAL_SELECT_MAX_PER_DOMAIN"]),
             sources_config_path=dotenv_values_dict["SOURCES_CONFIG_PATH"],
             from_email=dotenv_values_dict["FROM_EMAIL"],
-            to_email=dotenv_values_dict["TO_EMAIL"],
+            to_email=[
+                addr.strip() for addr in dotenv_values_dict["TO_EMAIL"].split(",") if addr.strip()
+            ],
         )
 
         logger.info("config_loaded_successfully", environment="production")

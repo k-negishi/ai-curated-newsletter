@@ -22,7 +22,7 @@ async def test_notification_flow_success(mock_ses_client) -> None:
     notifier = Notifier(
         ses_client=mock_ses_client,
         from_email="sender@example.com",
-        to_email="recipient@example.com",
+        to_email=["recipient@example.com"],
     )
 
     subject = "Test Newsletter"
@@ -46,6 +46,23 @@ async def test_notification_flow_success(mock_ses_client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_notification_flow_multiple_recipients(mock_ses_client) -> None:
+    """複数アドレスへの配信が正常に動作することを確認."""
+    notifier = Notifier(
+        ses_client=mock_ses_client,
+        from_email="sender@example.com",
+        to_email=["a@example.com", "b@example.com"],
+    )
+
+    result = notifier.send(subject="Multi-recipient Test", body="body text")
+
+    assert result.message_id == "test-message-id"
+
+    call_args = mock_ses_client.send_email.call_args[1]
+    assert call_args["Destination"]["ToAddresses"] == ["a@example.com", "b@example.com"]
+
+
+@pytest.mark.asyncio
 async def test_notification_flow_error_handling(mock_ses_client) -> None:
     """通知エラーが適切にハンドリングされることを確認."""
     # SESエラーをシミュレート
@@ -54,7 +71,7 @@ async def test_notification_flow_error_handling(mock_ses_client) -> None:
     notifier = Notifier(
         ses_client=mock_ses_client,
         from_email="sender@example.com",
-        to_email="recipient@example.com",
+        to_email=["recipient@example.com"],
     )
 
     subject = "Test Newsletter"
@@ -73,7 +90,7 @@ async def test_notification_flow_with_html_body(mock_ses_client) -> None:
     notifier = Notifier(
         ses_client=mock_ses_client,
         from_email="sender@example.com",
-        to_email="recipient@example.com",
+        to_email=["recipient@example.com"],
     )
 
     result = notifier.send(

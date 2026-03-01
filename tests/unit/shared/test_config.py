@@ -46,7 +46,7 @@ def test_load_config_local_defaults() -> None:
         assert config.final_select_max_per_domain == 0
         assert config.sources_config_path == "config/sources.yaml"
         assert config.from_email == "noreply@example.com"
-        assert config.to_email == "recipient@example.com"
+        assert config.to_email == ["recipient@example.com"]
 
 
 def test_load_config_local_with_env_vars() -> None:
@@ -81,7 +81,7 @@ def test_load_config_local_with_env_vars() -> None:
         assert config.final_select_max_per_domain == 5
         assert config.sources_config_path == "custom/sources.yaml"
         assert config.from_email == "custom-from@example.com"
-        assert config.to_email == "custom-to@example.com"
+        assert config.to_email == ["custom-to@example.com"]
 
 
 def test_load_config_local_dry_run_variations() -> None:
@@ -124,7 +124,7 @@ def test_app_config_dataclass() -> None:
         final_select_max_per_domain=4,
         sources_config_path="sources.yaml",
         from_email="from@example.com",
-        to_email="to@example.com",
+        to_email=["to@example.com"],
     )
 
     assert config.environment == "local"
@@ -230,7 +230,7 @@ TO_EMAIL=prod-to@example.com
     assert config.final_select_max_per_domain == 5
     assert config.sources_config_path == "config/sources.yaml"
     assert config.from_email == "prod-from@example.com"
-    assert config.to_email == "prod-to@example.com"
+    assert config.to_email == ["prod-to@example.com"]
     mock_ssm.get_parameter.assert_called_once_with(
         Name="/ai-curated-newsletter/dotenv",
         WithDecryption=True,
@@ -256,6 +256,66 @@ def test_load_config_local_loads_env_local_with_override() -> None:
         mock_load_dotenv.assert_any_call(".env")
         mock_load_dotenv.assert_any_call(".env.local", override=True)
         assert config.environment == "local"
+
+
+def test_load_config_local_to_email_multiple_addresses() -> None:
+    """TO_EMAIL にカンマ区切りの複数アドレスを指定した場合、リストとして返されることを確認."""
+    with patch.dict(
+        os.environ,
+        {"ENVIRONMENT": "local", "TO_EMAIL": "addr1@example.com,addr2@example.com"},
+        clear=False,
+    ):
+        config = _load_config_local()
+
+    assert config.to_email == ["addr1@example.com", "addr2@example.com"]
+
+
+def test_load_config_local_to_email_multiple_addresses_with_spaces() -> None:
+    """TO_EMAIL のカンマ区切りにスペースが含まれていても正しくパースされることを確認."""
+    with patch.dict(
+        os.environ,
+        {"ENVIRONMENT": "local", "TO_EMAIL": " addr1@example.com , addr2@example.com "},
+        clear=False,
+    ):
+        config = _load_config_local()
+
+    assert config.to_email == ["addr1@example.com", "addr2@example.com"]
+
+
+def test_load_config_local_to_email_single_address_backward_compatible() -> None:
+    """単一アドレスが後方互換で1要素のリストとして返されることを確認."""
+    with patch.dict(
+        os.environ,
+        {"ENVIRONMENT": "local", "TO_EMAIL": "single@example.com"},
+        clear=False,
+    ):
+        config = _load_config_local()
+
+    assert config.to_email == ["single@example.com"]
+
+
+def test_load_config_from_ssm_to_email_multiple_addresses() -> None:
+    """SSM の dotenv 内 TO_EMAIL がカンマ区切りでも正しくパースされることを確認."""
+    dotenv_content = """LOG_LEVEL=INFO
+DRY_RUN=false
+DYNAMODB_CACHE_TABLE=prod-cache
+DYNAMODB_HISTORY_TABLE=prod-history
+BEDROCK_MODEL_ID=anthropic.claude-haiku-4-5-20251001-v1:0
+BEDROCK_MAX_PARALLEL=8
+LLM_CANDIDATE_MAX=180
+FINAL_SELECT_MAX=15
+FINAL_SELECT_MAX_PER_DOMAIN=5
+SOURCES_CONFIG_PATH=config/sources.yaml
+FROM_EMAIL=prod-from@example.com
+TO_EMAIL=addr1@example.com,addr2@example.com
+"""
+    mock_ssm = Mock()
+    mock_ssm.get_parameter.return_value = {"Parameter": {"Value": dotenv_content}}
+
+    with patch("src.shared.config.boto3.client", return_value=mock_ssm):
+        config = _load_config_from_ssm()
+
+    assert config.to_email == ["addr1@example.com", "addr2@example.com"]
 
 
 def test_load_config_from_ssm_dotenv_parameter_missing_required() -> None:

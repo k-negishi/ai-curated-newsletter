@@ -32,7 +32,7 @@ def test_dry_run_notifier_skip(mock_ses_client) -> None:
     notifier = Notifier(
         ses_client=mock_ses_client,
         from_email="sender@example.com",
-        to_email="recipient@example.com",
+        to_email=["recipient@example.com"],
         dry_run=True,
     )
 
@@ -51,7 +51,7 @@ def test_dry_run_notifier_not_skip(mock_ses_client) -> None:
     notifier = Notifier(
         ses_client=mock_ses_client,
         from_email="sender@example.com",
-        to_email="recipient@example.com",
+        to_email=["recipient@example.com"],
         dry_run=False,
     )
 
@@ -126,7 +126,7 @@ def test_dry_run_default_false(mock_ses_client) -> None:
     notifier = Notifier(
         ses_client=mock_ses_client,
         from_email="sender@example.com",
-        to_email="recipient@example.com",
+        to_email=["recipient@example.com"],
     )
 
     assert notifier._dry_run is False
