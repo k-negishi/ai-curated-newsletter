@@ -5,7 +5,9 @@
       "Bash(git push:*)",
       "Bash(git pull:*)",
       "Bash(gh issue comment:*)",
-      "Bash(gh issue view:*)"
+      "Bash(gh issue view:*)",
+      "Skill(close-issue)",
+      "Bash(gunzip:*)"
     ]
   }
 }
