@@ -87,40 +87,62 @@ class Notifier:
             )
             return NotificationResult(message_id="dry-run", sent_at=now_utc())
 
-        try:
-            # SES send_email
-            message_body: dict[str, dict[str, str]] = {
-                "Text": {"Data": body, "Charset": "UTF-8"},
-            }
-            if html_body is not None:
-                message_body["Html"] = {"Data": html_body, "Charset": "UTF-8"}
+        # SES メッセージボディの構築
+        message_body: dict[str, dict[str, str]] = {
+            "Text": {"Data": body, "Charset": "UTF-8"},
+        }
+        if html_body is not None:
+            message_body["Html"] = {"Data": html_body, "Charset": "UTF-8"}
 
-            response = self._ses_client.send_email(
-                Source=self._from_email,
-                Destination={"ToAddresses": self._to_email},
-                Message={
-                    "Subject": {"Data": subject, "Charset": "UTF-8"},
-                    "Body": message_body,
-                },
+        # 各アドレスに個別送信（1件失敗しても他は継続）
+        succeeded: list[tuple[str, str]] = []  # (email, message_id)
+        failed: list[tuple[str, Exception]] = []
+
+        for email in self._to_email:
+            try:
+                response = self._ses_client.send_email(
+                    Source=self._from_email,
+                    Destination={"ToAddresses": [email]},
+                    Message={
+                        "Subject": {"Data": subject, "Charset": "UTF-8"},
+                        "Body": message_body,
+                    },
+                )
+                succeeded.append((email, response["MessageId"]))
+                logger.info(
+                    "notification_sent_single",
+                    to_email=mask_email(email),
+                    message_id=response["MessageId"],
+                )
+            except Exception as e:
+                logger.error(
+                    "notification_failed_single",
+                    to_email=mask_email(email),
+                    error=str(e),
+                )
+                failed.append((email, e))
+
+        # 全件失敗した場合のみエラー
+        if not succeeded:
+            errors = "; ".join(str(e) for _, e in failed)
+            raise NotificationError(f"Failed to send email to all recipients: {errors}")
+
+        # 部分失敗は警告ログ（Lambdaは正常終了扱い）
+        if failed:
+            logger.warning(
+                "notification_partial_failure",
+                succeeded_count=len(succeeded),
+                failed_count=len(failed),
+                failed_emails=[mask_email(e) for e, _ in failed],
             )
 
-            message_id = response["MessageId"]
-            sent_at = now_utc()
+        elapsed = time.time() - start_time
+        first_message_id = succeeded[0][1]
+        logger.info(
+            "notification_success",
+            message_id=first_message_id,
+            to_email=[mask_email(e) for e, _ in succeeded],
+            elapsed_seconds=round(elapsed, 2),
+        )
 
-            elapsed = time.time() - start_time
-            logger.info(
-                "notification_success",
-                message_id=message_id,
-                to_email=[mask_email(e) for e in self._to_email],
-                elapsed_seconds=round(elapsed, 2),
-            )
-
-            return NotificationResult(message_id=message_id, sent_at=sent_at)
-
-        except Exception as e:
-            logger.error(
-                "notification_failed",
-                to_email=[mask_email(e) for e in self._to_email],
-                error=str(e),
-            )
-            raise NotificationError(f"Failed to send email: {e}") from e
+        return NotificationResult(message_id=first_message_id, sent_at=now_utc())
