@@ -6,7 +6,6 @@ set -euo pipefail
 # 実行時オプション（必要に応じて環境変数で上書き可能）
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 ENV_FILE=${ENV_FILE:-"${REPO_ROOT}/.env"}
-SSM_DOTENV_PARAMETER=${SSM_DOTENV_PARAMETER:-/ai-curated-newsletter/dotenv}
 STACK_NAME=${STACK_NAME:-ai-curated-newsletter}
 SAM_CONFIG_FILE=${SAM_CONFIG_FILE:-"${REPO_ROOT}/samconfig.toml"}
 SAM_CONFIG_ENV=${SAM_CONFIG_ENV:-default}
@@ -29,20 +28,6 @@ set +a
 
 # デフォルトリージョン（.env 未設定時のフォールバック）
 AWS_REGION=${AWS_REGION:-ap-northeast-1}
-
-# プロジェクト仮想環境があれば優先利用、なければ system python3 を使う
-if [[ -x "${REPO_ROOT}/.venv/bin/python" ]]; then
-  PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
-else
-  PYTHON_BIN="python3"
-fi
-
-# .env 全文を 1つの SecureString として登録する
-echo ">>> Uploading .env values to SSM Parameter Store"
-"${PYTHON_BIN}" "${REPO_ROOT}/scripts/sync_env_to_ssm.py" \
-  --env-file "${ENV_FILE}" \
-  --parameter-name "${SSM_DOTENV_PARAMETER}" \
-  --region "${AWS_REGION}"
 
 # SAM パラメータとして渡すメールアドレスが空ならここで停止する
 : "${FROM_EMAIL:?FROM_EMAIL is required in ${ENV_FILE}}"
