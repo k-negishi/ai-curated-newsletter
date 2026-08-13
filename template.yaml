@@ -64,11 +64,11 @@ Resources:
               Resource:
                 - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ai-curated-newsletter/*'
       Events:
-        DailySchedule:
+        WeeklySchedule:
           Type: Schedule
           Properties:
-            Schedule: cron(0 0 * * ? *)  # 毎日JST 09:00 (UTC 00:00)
-            Description: 毎日JST 09:00にニュースレターを実行
+            Schedule: cron(0 0 ? * 3,6 *)  # 火曜・金曜 JST 09:00 (UTC 00:00)
+            Description: 火曜・金曜 JST 09:00にニュースレターを実行
             Enabled: true
 
   # DynamoDB Cache Table
